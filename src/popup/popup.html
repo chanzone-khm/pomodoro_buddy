@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pomodoro Buddy</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="min-w-[300px] bg-gray-100 p-4">
+  <div class="bg-white rounded-lg shadow-md p-4">
+    <div class="flex justify-center mb-2">
+      <span id="session-indicator" class="session-indicator session-work">
+        作業中
+      </span>
+    </div>
+    
+    <div id="timer-display" class="timer-display">
+      25:00
+    </div>
+    
+    <div class="flex justify-center gap-2 mt-4">
+      <button id="start-btn" class="btn btn-primary">
+        開始
+      </button>
+      <button id="pause-btn" class="btn btn-secondary" disabled>
+        一時停止
+      </button>
+      <button id="reset-btn" class="btn btn-secondary">
+        リセット
+      </button>
+    </div>
+  </div>
+
+  <script type="module" src="popup.ts"></script>
+</body>
+</html> 
