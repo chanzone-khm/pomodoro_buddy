@@ -1,0 +1,2 @@
+# pomodoro_buddy
+バイブコーディング体験でpomodoroタイマー拡張機能を作る
