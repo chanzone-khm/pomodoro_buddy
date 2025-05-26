@@ -6,8 +6,8 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'src/popup/popup.html'),
         background: resolve(__dirname, 'src/background.ts'),
+        popup: resolve(__dirname, 'src/popup/popup.html'),
       },
       output: {
         entryFileNames: '[name].js',
@@ -16,7 +16,7 @@ export default defineConfig({
       }
     },
     // Chrome拡張機能用の最適化
-    minify: 'terser',
+    minify: true,
     sourcemap: false
   },
   resolve: {

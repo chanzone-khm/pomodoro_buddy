@@ -4,7 +4,7 @@
   "description": "25/5 ポモドーロを手元で簡単管理！",
   "version": "0.1.0",
   "action": {
-    "default_popup": "popup/popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
