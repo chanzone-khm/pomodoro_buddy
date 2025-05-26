@@ -14,7 +14,10 @@ export default defineConfig({
         chunkFileNames: '[name].js',
         assetFileNames: '[name].[ext]'
       }
-    }
+    },
+    // Chrome拡張機能用の最適化
+    minify: 'terser',
+    sourcemap: false
   },
   resolve: {
     alias: {

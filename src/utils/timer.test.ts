@@ -1,16 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   createTimerState,
   startTimer,
   pauseTimer,
-  resetTimer,
   calculateRemainingTime,
-  isTimerCompleted,
   formatTime,
   calculateBadgeText,
   DEFAULT_TIMER_SETTINGS
 } from './timer';
-import { SessionType } from '../types/index';
+import { SessionType } from '../types/index.js';
 
 describe('Timer Utility Functions', () => {
   // Date.nowのモック

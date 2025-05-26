@@ -5,7 +5,7 @@ import {
   StorageKey,
   MessageAction,
   Message
-} from './types/index';
+} from './types/index.js';
 import {
   DEFAULT_TIMER_SETTINGS,
   createTimerState,
@@ -182,8 +182,8 @@ async function saveState() {
 /**
  * メッセージハンドラー
  */
-chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) => {
-  const { action, payload } = message;
+chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
+  const { action } = message;
   
   switch (action) {
     case MessageAction.START:

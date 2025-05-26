@@ -1,4 +1,4 @@
-import { SessionType, TimerState, TimerSettings } from '../types/index';
+import { SessionType, TimerState, TimerSettings } from '../types/index.js';
 
 /**
  * デフォルトのタイマー設定

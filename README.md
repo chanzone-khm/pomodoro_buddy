@@ -77,7 +77,7 @@ pomodoro-buddy/
 │  │   ├─ timer.ts       // タイマー計算ロジック
 │  │   └─ timer.test.ts  // タイマーのユニットテスト
 │  └─ types/
-│      └─ index.d.ts     // 型定義
+│      └─ index.ts       // 型定義
 ├─ public/
 │  ├─ manifest.json      // 拡張機能マニフェスト
 │  └─ icons/             // アイコン画像

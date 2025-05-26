@@ -1,4 +1,4 @@
-import { MessageAction, SessionType, TimerState } from '../types/index';
+import { MessageAction, SessionType, TimerState } from '../types/index.js';
 import { formatTime } from '../utils/timer';
 
 // HTMLエレメントの取得
