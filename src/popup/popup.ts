@@ -12,10 +12,23 @@ import {
   type ProgressBarSettings,
   type ProgressBarState
 } from '../utils/progress.js';
+import {
+  calculateCycleState,
+  advanceCycle,
+  resetCycle,
+  getCycleProgressText,
+  getCycleCompletionMessage,
+  loadCycleSettings,
+  saveCycleSettings,
+  DEFAULT_CYCLE_SETTINGS,
+  type CycleSettings,
+  type CycleState
+} from '../utils/cycle.js';
 
 // HTMLエレメントの取得
 const timerDisplay = document.getElementById('timer-display') as HTMLElement;
 const sessionIndicator = document.getElementById('session-indicator') as HTMLElement;
+const cycleProgress = document.getElementById('cycle-progress') as HTMLElement;
 const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
@@ -33,6 +46,11 @@ const progressEnabledCheckbox = document.getElementById('progress-enabled') as H
 const progressTypeSelect = document.getElementById('progress-type') as HTMLSelectElement;
 const progressPercentageCheckbox = document.getElementById('progress-percentage') as HTMLInputElement;
 
+// サイクル関連のエレメント
+const cycleCountSelect = document.getElementById('cycle-count') as HTMLSelectElement;
+const longBreakIntervalSelect = document.getElementById('long-break-interval') as HTMLSelectElement;
+const resetCycleBtn = document.getElementById('reset-cycle') as HTMLButtonElement;
+
 // タイマーの状態
 let timerState: TimerState | null = null;
 let timerSettings: TimerSettings | null = null;
@@ -43,6 +61,10 @@ let updateInterval: ReturnType<typeof setInterval> | null = null;
 let progressSettings: ProgressBarSettings = DEFAULT_PROGRESS_SETTINGS;
 let currentProgressState: ProgressBarState | null = null;
 
+// サイクルの状態
+let cycleSettings: CycleSettings = DEFAULT_CYCLE_SETTINGS;
+let currentCycleState: CycleState | null = null;
+
 /**
  * 初期化
  */
@@ -52,6 +74,9 @@ async function initialize() {
   
   // プログレスバー設定を読み込み
   progressSettings = await loadProgressSettings();
+  
+  // サイクル設定を読み込み
+  cycleSettings = await loadCycleSettings();
   
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
@@ -69,10 +94,16 @@ async function initialize() {
   progressTypeSelect.addEventListener('change', handleProgressTypeChange);
   progressPercentageCheckbox.addEventListener('change', handleProgressPercentageChange);
   
+  // サイクル関連のイベントリスナー
+  cycleCountSelect.addEventListener('change', handleCycleCountChange);
+  longBreakIntervalSelect.addEventListener('change', handleLongBreakIntervalChange);
+  resetCycleBtn.addEventListener('click', handleResetCycle);
+  
   // 最初の表示更新
   updateDisplay();
   updateSettingsDisplay();
   updateProgressSettingsDisplay();
+  updateCycleSettingsDisplay();
   updateProgressBar();
   
   // 定期的に状態を更新
@@ -115,6 +146,9 @@ function updateDisplay() {
     sessionIndicator.textContent = '休憩中';
     sessionIndicator.className = 'session-indicator session-break';
   }
+  
+  // サイクル進行状況を更新
+  updateCycleDisplay();
   
   // ボタン状態を更新
   updateButtonState();
@@ -325,6 +359,67 @@ function updateProgressSettingsDisplay() {
   progressEnabledCheckbox.checked = progressSettings.enabled;
   progressTypeSelect.value = progressSettings.type;
   progressPercentageCheckbox.checked = progressSettings.showPercentage;
+}
+
+/**
+ * サイクル表示を更新する
+ */
+function updateCycleDisplay() {
+  if (!timerState) return;
+  
+  currentCycleState = calculateCycleState(cycleSettings, timerState.type);
+  cycleProgress.textContent = getCycleProgressText(currentCycleState);
+  
+  // 完了時の表示変更
+  if (currentCycleState.isCompleted) {
+    cycleProgress.className = 'cycle-progress bg-green-50 text-green-600';
+  } else {
+    cycleProgress.className = 'cycle-progress';
+  }
+}
+
+/**
+ * サイクル設定表示を更新する
+ */
+function updateCycleSettingsDisplay() {
+  cycleCountSelect.value = cycleSettings.totalCycles.toString();
+  longBreakIntervalSelect.value = cycleSettings.longBreakInterval.toString();
+}
+
+/**
+ * サイクル数変更ハンドラー
+ */
+async function handleCycleCountChange() {
+  cycleSettings.totalCycles = parseInt(cycleCountSelect.value);
+  await saveCycleSettings(cycleSettings);
+  updateCycleDisplay();
+}
+
+/**
+ * 長い休憩間隔変更ハンドラー
+ */
+async function handleLongBreakIntervalChange() {
+  cycleSettings.longBreakInterval = parseInt(longBreakIntervalSelect.value);
+  await saveCycleSettings(cycleSettings);
+}
+
+/**
+ * サイクルリセットハンドラー
+ */
+async function handleResetCycle() {
+  cycleSettings = resetCycle(cycleSettings);
+  await saveCycleSettings(cycleSettings);
+  updateCycleDisplay();
+  
+  // 通知
+  if (chrome.notifications) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Pomodoro Buddy',
+      message: 'サイクルをリセットしました'
+    });
+  }
 }
 
 // 初期化

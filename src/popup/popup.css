@@ -35,6 +35,10 @@
     @apply bg-pomodoro-green/10 text-pomodoro-green;
   }
   
+  .cycle-progress {
+    @apply text-xs font-medium text-center py-1 px-2 rounded-full bg-blue-50 text-blue-600;
+  }
+  
   .btn-small {
     @apply px-2 py-1 text-xs rounded font-medium transition-colors duration-200;
   }

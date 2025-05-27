@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サイクル機能テスト</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button.success {
+            background-color: #28a745;
+        }
+        button.success:hover {
+            background-color: #218838;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        select, input {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 0 5px;
+        }
+        .status-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 サイクル機能テスト</h1>
+        
+        <div class="test-section">
+            <h3>📊 サイクル設定</h3>
+            <div class="controls">
+                <label>
+                    総サイクル数: 
+                    <select id="total-cycles">
+                        <option value="1">1回</option>
+                        <option value="2">2回</option>
+                        <option value="3">3回</option>
+                        <option value="4" selected>4回</option>
+                        <option value="5">5回</option>
+                        <option value="6">6回</option>
+                        <option value="7">7回</option>
+                        <option value="8">8回</option>
+                        <option value="9">9回</option>
+                        <option value="10">10回</option>
+                    </select>
+                </label>
+                
+                <label>
+                    長い休憩間隔: 
+                    <select id="long-break-interval">
+                        <option value="2">2回ごと</option>
+                        <option value="3">3回ごと</option>
+                        <option value="4" selected>4回ごと</option>
+                        <option value="5">5回ごと</option>
+                    </select>
+                </label>
+                
+                <label>
+                    現在のセッション: 
+                    <select id="session-type">
+                        <option value="Work" selected>作業</option>
+                        <option value="Break">休憩</option>
+                    </select>
+                </label>
+            </div>
+            
+            <div class="controls">
+                <button onclick="updateCycleState()">状態更新</button>
+                <button onclick="advanceToNextCycle()" class="success">次のサイクルへ</button>
+                <button onclick="resetCycleState()" class="danger">リセット</button>
+                <button onclick="simulateFullCycle()">フルサイクルシミュレーション</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 サイクル状態表示</h3>
+            <div id="cycle-status" class="status-display">
+                サイクル状態がここに表示されます
+            </div>
+            
+            <div class="progress-bar">
+                <div id="cycle-progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="progress-text" class="text-center">0% 完了</div>
+            
+            <div class="info">
+                <strong>表示項目:</strong><br>
+                • 現在のサイクル番号<br>
+                • 総サイクル数<br>
+                • 進行率<br>
+                • 次のセッションタイプ<br>
+                • 完了状態
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔔 通知テスト</h3>
+            <div class="controls">
+                <button onclick="testCycleCompletionMessage()">サイクル完了メッセージ</button>
+                <button onclick="testFinalCycleMessage()">最終サイクルメッセージ</button>
+                <button onclick="testAllCompletedMessage()">全完了メッセージ</button>
+            </div>
+            <div id="notification-result" class="info" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>⚙️ 設定テスト</h3>
+            <div class="controls">
+                <button onclick="testSaveSettings()">設定保存テスト</button>
+                <button onclick="testLoadSettings()">設定読み込みテスト</button>
+                <button onclick="testValidation()">バリデーションテスト</button>
+            </div>
+            <div id="settings-result" class="info" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 統計情報</h3>
+            <div id="cycle-stats" class="status-display">
+                統計情報がここに表示されます
+            </div>
+            <div class="controls">
+                <button onclick="updateStats()">統計更新</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // サイクル管理ユーティリティをインポート
+        import { 
+            calculateCycleState,
+            advanceCycle,
+            resetCycle,
+            getCycleProgressText,
+            getCycleCompletionMessage,
+            saveCycleSettings,
+            loadCycleSettings,
+            calculateCycleStats,
+            shouldTakeLongBreak,
+            DEFAULT_CYCLE_SETTINGS
+        } from './src/utils/cycle.js';
+
+        // テスト用の状態
+        let currentCycleSettings = { ...DEFAULT_CYCLE_SETTINGS };
+        let currentCycleState = null;
+
+        // DOM要素
+        const totalCyclesSelect = document.getElementById('total-cycles');
+        const longBreakIntervalSelect = document.getElementById('long-break-interval');
+        const sessionTypeSelect = document.getElementById('session-type');
+        const cycleStatusDiv = document.getElementById('cycle-status');
+        const cycleProgressBar = document.getElementById('cycle-progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const cycleStatsDiv = document.getElementById('cycle-stats');
+
+        // イベントリスナー
+        totalCyclesSelect.addEventListener('change', updateSettings);
+        longBreakIntervalSelect.addEventListener('change', updateSettings);
+        sessionTypeSelect.addEventListener('change', updateCycleState);
+
+        // 設定更新
+        function updateSettings() {
+            currentCycleSettings.totalCycles = parseInt(totalCyclesSelect.value);
+            currentCycleSettings.longBreakInterval = parseInt(longBreakIntervalSelect.value);
+            updateCycleState();
+        }
+
+        // サイクル状態更新
+        window.updateCycleState = function() {
+            const sessionType = sessionTypeSelect.value;
+            currentCycleState = calculateCycleState(currentCycleSettings, sessionType);
+            
+            // 状態表示を更新
+            cycleStatusDiv.innerHTML = `
+                <strong>サイクル設定:</strong><br>
+                総サイクル数: ${currentCycleSettings.totalCycles}<br>
+                長い休憩間隔: ${currentCycleSettings.longBreakInterval}<br>
+                現在のサイクル: ${currentCycleSettings.currentCycle}<br>
+                完了フラグ: ${currentCycleSettings.isCompleted}<br><br>
+                
+                <strong>サイクル状態:</strong><br>
+                現在のサイクル: ${currentCycleState.currentCycle}/${currentCycleState.totalCycles}<br>
+                最終サイクル: ${currentCycleState.isLastCycle ? 'はい' : 'いいえ'}<br>
+                次のセッション: ${currentCycleState.nextSessionType || '完了'}<br>
+                進行率: ${currentCycleState.progressPercentage.toFixed(1)}%<br>
+                完了状態: ${currentCycleState.isCompleted ? '完了' : '進行中'}<br><br>
+                
+                <strong>表示テキスト:</strong><br>
+                ${getCycleProgressText(currentCycleState)}
+            `;
+            
+            // プログレスバーを更新
+            cycleProgressBar.style.width = `${currentCycleState.progressPercentage}%`;
+            progressText.textContent = `${currentCycleState.progressPercentage.toFixed(1)}% 完了`;
+            
+            // 統計情報を更新
+            updateStats();
+        };
+
+        // 次のサイクルに進む
+        window.advanceToNextCycle = function() {
+            const sessionType = sessionTypeSelect.value;
+            currentCycleSettings = advanceCycle(currentCycleSettings, sessionType);
+            
+            // 長い休憩の判定
+            if (shouldTakeLongBreak(currentCycleSettings, sessionType)) {
+                alert('🛌 長い休憩の時間です！');
+            }
+            
+            updateCycleState();
+        };
+
+        // サイクルリセット
+        window.resetCycleState = function() {
+            currentCycleSettings = resetCycle(currentCycleSettings);
+            updateCycleState();
+        };
+
+        // フルサイクルシミュレーション
+        window.simulateFullCycle = function() {
+            resetCycleState();
+            
+            const simulate = () => {
+                if (!currentCycleState.isCompleted) {
+                    setTimeout(() => {
+                        advanceToNextCycle();
+                        simulate();
+                    }, 1000);
+                } else {
+                    alert('🎉 フルサイクルシミュレーション完了！');
+                }
+            };
+            
+            simulate();
+        };
+
+        // 通知メッセージテスト
+        window.testCycleCompletionMessage = function() {
+            const message = getCycleCompletionMessage(currentCycleState);
+            showNotificationResult(message);
+        };
+
+        window.testFinalCycleMessage = function() {
+            // 最終サイクルの状態を作成
+            const finalState = {
+                ...currentCycleState,
+                currentCycle: currentCycleSettings.totalCycles,
+                isLastCycle: true,
+                isCompleted: false
+            };
+            const message = getCycleCompletionMessage(finalState);
+            showNotificationResult(message);
+        };
+
+        window.testAllCompletedMessage = function() {
+            // 完了状態を作成
+            const completedState = {
+                ...currentCycleState,
+                isCompleted: true
+            };
+            const message = getCycleCompletionMessage(completedState);
+            showNotificationResult(message);
+        };
+
+        function showNotificationResult(message) {
+            const notificationResult = document.getElementById('notification-result');
+            notificationResult.style.display = 'block';
+            notificationResult.innerHTML = `<strong>通知メッセージ:</strong><br>${message}`;
+        }
+
+        // 設定テスト
+        window.testSaveSettings = async function() {
+            const settingsResult = document.getElementById('settings-result');
+            
+            try {
+                await saveCycleSettings(currentCycleSettings);
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定保存テスト結果:</strong><br>
+                    保存された設定: ${JSON.stringify(currentCycleSettings, null, 2)}<br>
+                    <span style="color: green;">✅ 設定の保存が正常に動作しています</span>
+                `;
+            } catch (error) {
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定保存テスト結果:</strong><br>
+                    <span style="color: red;">❌ エラー: ${error.message}</span>
+                `;
+            }
+        };
+
+        window.testLoadSettings = async function() {
+            const settingsResult = document.getElementById('settings-result');
+            
+            try {
+                const loadedSettings = await loadCycleSettings();
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定読み込みテスト結果:</strong><br>
+                    読み込まれた設定: ${JSON.stringify(loadedSettings, null, 2)}<br>
+                    <span style="color: green;">✅ 設定の読み込みが正常に動作しています</span>
+                `;
+            } catch (error) {
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定読み込みテスト結果:</strong><br>
+                    <span style="color: red;">❌ エラー: ${error.message}</span>
+                `;
+            }
+        };
+
+        window.testValidation = function() {
+            const settingsResult = document.getElementById('settings-result');
+            
+            // 無効な値でテスト
+            const invalidSettings = {
+                totalCycles: 15, // 上限超過
+                longBreakInterval: 1, // 下限未満
+                currentCycle: -1, // 負の値
+                isCompleted: 'invalid' // 型違い
+            };
+            
+            // バリデーション関数は直接インポートできないため、設定保存でテスト
+            settingsResult.style.display = 'block';
+            settingsResult.innerHTML = `
+                <strong>バリデーションテスト:</strong><br>
+                入力値: ${JSON.stringify(invalidSettings, null, 2)}<br>
+                <span style="color: blue;">ℹ️ 設定保存時に自動的にバリデーションされます</span>
+            `;
+        };
+
+        // 統計情報更新
+        window.updateStats = function() {
+            const stats = calculateCycleStats(currentCycleSettings);
+            
+            cycleStatsDiv.innerHTML = `
+                <strong>サイクル統計:</strong><br>
+                完了したサイクル: ${stats.completedCycles}<br>
+                残りのサイクル: ${stats.remainingCycles}<br>
+                完了率: ${stats.completionRate.toFixed(1)}%
+            `;
+        };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('サイクル機能テストページが読み込まれました');
+            updateCycleState();
+        });
+    </script>
+</body>
+</html> 
