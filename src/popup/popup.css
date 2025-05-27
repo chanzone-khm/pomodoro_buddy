@@ -46,4 +46,42 @@
   .btn-small:disabled {
     @apply opacity-50 cursor-not-allowed;
   }
+  
+  /* プログレスバー関連のスタイル */
+  .progress-bar-container {
+    @apply flex items-center justify-center;
+  }
+  
+  .circular-progress-container {
+    @apply relative flex items-center justify-center;
+  }
+  
+  .circular-progress-svg {
+    @apply transform -rotate-90;
+  }
+  
+  .linear-progress-container {
+    @apply w-full;
+  }
+  
+  .linear-progress-track {
+    @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+  }
+  
+  .linear-progress-bar {
+    @apply h-full rounded-full transition-all duration-500 ease-in-out;
+  }
+  
+  .progress-percentage {
+    @apply absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-600;
+  }
+  
+  /* プログレスバーのアニメーション */
+  .progress-bar-container .circular-progress-svg circle {
+    transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.3s ease-in-out;
+  }
+  
+  .progress-bar-container .linear-progress-bar {
+    transition: width 0.5s ease-in-out, background-color 0.3s ease-in-out;
+  }
 } 

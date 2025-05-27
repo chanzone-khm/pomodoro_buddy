@@ -18,6 +18,13 @@
       25:00
     </div>
     
+    <!-- プログレスバー -->
+    <div class="flex justify-center mt-3 mb-4">
+      <div id="progress-bar-container" class="progress-bar-container">
+        <!-- プログレスバーがここに動的に挿入されます -->
+      </div>
+    </div>
+    
     <div class="flex justify-center gap-2 mt-4">
       <button id="start-btn" class="btn btn-primary">
         開始
@@ -55,6 +62,39 @@
           <button id="test-break-sound" class="btn-small btn-secondary flex-1" disabled>
             休憩完了音テスト
           </button>
+        </div>
+        
+        <!-- プログレスバー設定 -->
+        <div class="border-t border-gray-200 pt-3 mt-3">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-700">
+              プログレスバー表示
+            </label>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="progress-enabled" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+          
+          <div class="flex items-center justify-between mb-3">
+            <label for="progress-type" class="text-sm text-gray-700">
+              プログレスバー形式
+            </label>
+            <select id="progress-type" class="text-sm border border-gray-300 rounded px-2 py-1">
+              <option value="circular">円形</option>
+              <option value="linear">リニア</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center justify-between">
+            <label class="text-sm text-gray-700">
+              パーセンテージ表示
+            </label>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="progress-percentage" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
         </div>
       </div>
     </div>

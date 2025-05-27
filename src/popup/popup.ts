@@ -1,6 +1,17 @@
 import { MessageAction, SessionType, TimerState, TimerSettings } from '../types/index.js';
 import { formatTime } from '../utils/timer.js';
 import { playSessionCompleteSound } from '../utils/audio.js';
+import { 
+  calculateProgressState, 
+  createCircularProgressBar, 
+  createLinearProgressBar,
+  updateProgressBarElement,
+  loadProgressSettings,
+  saveProgressSettings,
+  DEFAULT_PROGRESS_SETTINGS,
+  type ProgressBarSettings,
+  type ProgressBarState
+} from '../utils/progress.js';
 
 // HTMLエレメントの取得
 const timerDisplay = document.getElementById('timer-display') as HTMLElement;
@@ -16,11 +27,21 @@ const soundEnabledCheckbox = document.getElementById('sound-enabled') as HTMLInp
 const testWorkSoundBtn = document.getElementById('test-work-sound') as HTMLButtonElement;
 const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLButtonElement;
 
+// プログレスバー関連のエレメント
+const progressBarContainer = document.getElementById('progress-bar-container') as HTMLElement;
+const progressEnabledCheckbox = document.getElementById('progress-enabled') as HTMLInputElement;
+const progressTypeSelect = document.getElementById('progress-type') as HTMLSelectElement;
+const progressPercentageCheckbox = document.getElementById('progress-percentage') as HTMLInputElement;
+
 // タイマーの状態
 let timerState: TimerState | null = null;
 let timerSettings: TimerSettings | null = null;
 let remainingTime = 0;
 let updateInterval: ReturnType<typeof setInterval> | null = null;
+
+// プログレスバーの状態
+let progressSettings: ProgressBarSettings = DEFAULT_PROGRESS_SETTINGS;
+let currentProgressState: ProgressBarState | null = null;
 
 /**
  * 初期化
@@ -28,6 +49,9 @@ let updateInterval: ReturnType<typeof setInterval> | null = null;
 async function initialize() {
   // 現在の状態を取得
   await fetchTimerState();
+  
+  // プログレスバー設定を読み込み
+  progressSettings = await loadProgressSettings();
   
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
@@ -40,9 +64,16 @@ async function initialize() {
   testWorkSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Work));
   testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
   
+  // プログレスバー関連のイベントリスナー
+  progressEnabledCheckbox.addEventListener('change', handleProgressEnabledChange);
+  progressTypeSelect.addEventListener('change', handleProgressTypeChange);
+  progressPercentageCheckbox.addEventListener('change', handleProgressPercentageChange);
+  
   // 最初の表示更新
   updateDisplay();
   updateSettingsDisplay();
+  updateProgressSettingsDisplay();
+  updateProgressBar();
   
   // 定期的に状態を更新
   startDisplayUpdate();
@@ -87,6 +118,9 @@ function updateDisplay() {
   
   // ボタン状態を更新
   updateButtonState();
+  
+  // プログレスバーを更新
+  updateProgressBar();
 }
 
 /**
@@ -203,6 +237,94 @@ function updateTestButtonsState() {
   const isEnabled = timerSettings?.soundEnabled || false;
   testWorkSoundBtn.disabled = !isEnabled;
   testBreakSoundBtn.disabled = !isEnabled;
+}
+
+/**
+ * プログレスバーを更新する
+ */
+function updateProgressBar() {
+  if (!timerState || !progressBarContainer) return;
+  
+  // プログレスバーが無効の場合は非表示
+  if (!progressSettings.enabled || !progressSettings || progressSettings.type === undefined) {
+    progressBarContainer.style.display = 'none';
+    return;
+  }
+  
+  progressBarContainer.style.display = 'block';
+  
+  // プログレス状態を計算
+  currentProgressState = calculateProgressState(timerState, remainingTime);
+  
+  // プログレスバーのHTMLを生成
+  let progressBarHTML = '';
+  if (progressSettings.type === 'circular') {
+    progressBarHTML = createCircularProgressBar(currentProgressState, progressSettings, 100);
+  } else {
+    progressBarHTML = createLinearProgressBar(currentProgressState, progressSettings, 260);
+  }
+  
+  // 既存のプログレスバーがある場合は更新、ない場合は新規作成
+  if (progressBarContainer.children.length > 0) {
+    // 形式が変わった場合は完全に再生成
+    const existingType = progressBarContainer.querySelector('.circular-progress-container') ? 'circular' : 'linear';
+    if (existingType !== progressSettings.type) {
+      progressBarContainer.innerHTML = progressBarHTML;
+    } else {
+      updateProgressBarElement(progressBarContainer, currentProgressState, progressSettings);
+    }
+  } else {
+    progressBarContainer.innerHTML = progressBarHTML;
+  }
+}
+
+/**
+ * プログレスバー表示設定の変更ハンドラー
+ */
+async function handleProgressEnabledChange() {
+  const enabled = progressEnabledCheckbox.checked;
+  progressSettings.enabled = enabled;
+  await saveProgressSettings(progressSettings);
+  
+  if (enabled) {
+    progressBarContainer.style.display = 'block';
+    updateProgressBar();
+  } else {
+    progressBarContainer.style.display = 'none';
+  }
+}
+
+/**
+ * プログレスバー形式の変更ハンドラー
+ */
+async function handleProgressTypeChange() {
+  progressSettings.type = progressTypeSelect.value as 'circular' | 'linear';
+  await saveProgressSettings(progressSettings);
+  
+  // プログレスバーを完全に再生成するためにコンテナをクリア
+  progressBarContainer.innerHTML = '';
+  updateProgressBar();
+}
+
+/**
+ * プログレスバーパーセンテージ表示の変更ハンドラー
+ */
+async function handleProgressPercentageChange() {
+  progressSettings.showPercentage = progressPercentageCheckbox.checked;
+  await saveProgressSettings(progressSettings);
+  
+  // プログレスバーを完全に再生成するためにコンテナをクリア
+  progressBarContainer.innerHTML = '';
+  updateProgressBar();
+}
+
+/**
+ * プログレスバー設定表示を更新する
+ */
+function updateProgressSettingsDisplay() {
+  progressEnabledCheckbox.checked = progressSettings.enabled;
+  progressTypeSelect.value = progressSettings.type;
+  progressPercentageCheckbox.checked = progressSettings.showPercentage;
 }
 
 // 初期化

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プログレスバーテスト</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+        select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .progress-demo {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 150px;
+            margin: 20px 0;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 プログレスバー機能テスト</h1>
+        
+        <div class="test-section">
+            <h3>📊 プログレスバー設定</h3>
+            <div class="controls">
+                <label>
+                    進行率: 
+                    <input type="range" id="progress-slider" min="0" max="100" value="0">
+                    <span id="progress-value">0%</span>
+                </label>
+                
+                <label>
+                    形式: 
+                    <select id="progress-type">
+                        <option value="circular">円形</option>
+                        <option value="linear">リニア</option>
+                    </select>
+                </label>
+                
+                <label>
+                    <input type="checkbox" id="show-percentage" checked>
+                    パーセンテージ表示
+                </label>
+                
+                <label>
+                    セッション: 
+                    <select id="session-type">
+                        <option value="work">作業中</option>
+                        <option value="break">休憩中</option>
+                    </select>
+                </label>
+            </div>
+            
+            <div class="controls">
+                <button onclick="startDemo()">デモ開始</button>
+                <button onclick="stopDemo()">デモ停止</button>
+                <button onclick="resetProgress()">リセット</button>
+                <button onclick="testAnimation()">アニメーションテスト</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 円形プログレスバー</h3>
+            <div class="progress-demo">
+                <div id="circular-progress-container"></div>
+            </div>
+            <div class="info">
+                円形プログレスバーのテスト。SVGを使用してスムーズなアニメーションを実現。
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📏 リニアプログレスバー</h3>
+            <div class="progress-demo">
+                <div id="linear-progress-container"></div>
+            </div>
+            <div class="info">
+                リニアプログレスバーのテスト。CSSトランジションでスムーズな進行を表示。
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>⚙️ 設定テスト</h3>
+            <div class="controls">
+                <button onclick="testWorkColors()">作業色テスト</button>
+                <button onclick="testBreakColors()">休憩色テスト</button>
+                <button onclick="testSizeVariations()">サイズバリエーション</button>
+                <button onclick="saveTestSettings()">設定保存テスト</button>
+            </div>
+            <div id="settings-result" class="info" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📈 パフォーマンステスト</h3>
+            <div class="controls">
+                <button onclick="performanceTest()">パフォーマンステスト実行</button>
+                <button onclick="memoryTest()">メモリテスト</button>
+            </div>
+            <div id="performance-result" class="info" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // プログレスバーユーティリティをインポート
+        import { 
+            calculateProgressState,
+            createCircularProgressBar,
+            createLinearProgressBar,
+            updateProgressBarElement,
+            DEFAULT_PROGRESS_SETTINGS,
+            saveProgressSettings,
+            loadProgressSettings
+        } from './src/utils/progress.js';
+
+        // テスト用の状態
+        let currentProgress = 0;
+        let demoInterval = null;
+        let progressSettings = { ...DEFAULT_PROGRESS_SETTINGS };
+
+        // DOM要素
+        const progressSlider = document.getElementById('progress-slider');
+        const progressValue = document.getElementById('progress-value');
+        const progressTypeSelect = document.getElementById('progress-type');
+        const showPercentageCheckbox = document.getElementById('show-percentage');
+        const sessionTypeSelect = document.getElementById('session-type');
+        const circularContainer = document.getElementById('circular-progress-container');
+        const linearContainer = document.getElementById('linear-progress-container');
+
+        // イベントリスナー
+        progressSlider.addEventListener('input', updateProgress);
+        progressTypeSelect.addEventListener('change', updateSettings);
+        showPercentageCheckbox.addEventListener('change', updateSettings);
+        sessionTypeSelect.addEventListener('change', updateSettings);
+
+        // プログレス更新
+        function updateProgress() {
+            currentProgress = parseInt(progressSlider.value);
+            progressValue.textContent = `${currentProgress}%`;
+            renderProgressBars();
+        }
+
+        // 設定更新
+        function updateSettings() {
+            progressSettings.type = progressTypeSelect.value;
+            progressSettings.showPercentage = showPercentageCheckbox.checked;
+            renderProgressBars();
+        }
+
+        // プログレスバーをレンダリング
+        function renderProgressBars() {
+            const sessionType = sessionTypeSelect.value === 'work' ? 'Work' : 'Break';
+            
+            // モックのタイマー状態を作成
+            const mockTimerState = {
+                type: sessionType,
+                durationSec: 1500, // 25分
+                isRunning: true,
+                startEpoch: Date.now(),
+                pausedAt: undefined,
+                pausedElapsed: undefined
+            };
+
+            const remainingTime = Math.floor((100 - currentProgress) / 100 * 1500);
+            const progressState = calculateProgressState(mockTimerState, remainingTime);
+
+            // 円形プログレスバー
+            const circularHTML = createCircularProgressBar(progressState, progressSettings, 120);
+            circularContainer.innerHTML = circularHTML;
+
+            // リニアプログレスバー
+            const linearHTML = createLinearProgressBar(progressState, progressSettings, 300);
+            linearContainer.innerHTML = linearHTML;
+        }
+
+        // デモ開始
+        window.startDemo = function() {
+            if (demoInterval) clearInterval(demoInterval);
+            
+            currentProgress = 0;
+            demoInterval = setInterval(() => {
+                currentProgress += 1;
+                if (currentProgress > 100) {
+                    currentProgress = 0;
+                }
+                progressSlider.value = currentProgress;
+                updateProgress();
+            }, 100);
+        };
+
+        // デモ停止
+        window.stopDemo = function() {
+            if (demoInterval) {
+                clearInterval(demoInterval);
+                demoInterval = null;
+            }
+        };
+
+        // リセット
+        window.resetProgress = function() {
+            stopDemo();
+            currentProgress = 0;
+            progressSlider.value = 0;
+            updateProgress();
+        };
+
+        // アニメーションテスト
+        window.testAnimation = function() {
+            const steps = [0, 25, 50, 75, 100, 75, 50, 25, 0];
+            let stepIndex = 0;
+            
+            const animateStep = () => {
+                if (stepIndex < steps.length) {
+                    currentProgress = steps[stepIndex];
+                    progressSlider.value = currentProgress;
+                    updateProgress();
+                    stepIndex++;
+                    setTimeout(animateStep, 500);
+                }
+            };
+            
+            animateStep();
+        };
+
+        // 作業色テスト
+        window.testWorkColors = function() {
+            sessionTypeSelect.value = 'work';
+            updateSettings();
+            testAnimation();
+        };
+
+        // 休憩色テスト
+        window.testBreakColors = function() {
+            sessionTypeSelect.value = 'break';
+            updateSettings();
+            testAnimation();
+        };
+
+        // サイズバリエーションテスト
+        window.testSizeVariations = function() {
+            const sizes = [80, 100, 120, 140];
+            let sizeIndex = 0;
+            
+            const testSize = () => {
+                if (sizeIndex < sizes.length) {
+                    const size = sizes[sizeIndex];
+                    console.log(`サイズテスト: ${size}px`);
+                    
+                    // 円形プログレスバーのサイズを変更
+                    const sessionType = sessionTypeSelect.value === 'work' ? 'Work' : 'Break';
+                    const mockTimerState = {
+                        type: sessionType,
+                        durationSec: 1500,
+                        isRunning: true,
+                        startEpoch: Date.now()
+                    };
+                    const remainingTime = Math.floor((100 - currentProgress) / 100 * 1500);
+                    const progressState = calculateProgressState(mockTimerState, remainingTime);
+                    
+                    const circularHTML = createCircularProgressBar(progressState, progressSettings, size);
+                    circularContainer.innerHTML = circularHTML;
+                    
+                    sizeIndex++;
+                    setTimeout(testSize, 1000);
+                }
+            };
+            
+            testSize();
+        };
+
+        // 設定保存テスト
+        window.saveTestSettings = async function() {
+            const settingsResult = document.getElementById('settings-result');
+            
+            try {
+                await saveProgressSettings(progressSettings);
+                const loadedSettings = await loadProgressSettings();
+                
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定保存テスト結果:</strong><br>
+                    保存された設定: ${JSON.stringify(progressSettings, null, 2)}<br>
+                    読み込まれた設定: ${JSON.stringify(loadedSettings, null, 2)}<br>
+                    <span style="color: green;">✅ 設定の保存・読み込みが正常に動作しています</span>
+                `;
+            } catch (error) {
+                settingsResult.style.display = 'block';
+                settingsResult.innerHTML = `
+                    <strong>設定保存テスト結果:</strong><br>
+                    <span style="color: red;">❌ エラー: ${error.message}</span>
+                `;
+            }
+        };
+
+        // パフォーマンステスト
+        window.performanceTest = function() {
+            const performanceResult = document.getElementById('performance-result');
+            const iterations = 1000;
+            
+            console.time('プログレスバー生成テスト');
+            
+            for (let i = 0; i < iterations; i++) {
+                const mockTimerState = {
+                    type: 'Work',
+                    durationSec: 1500,
+                    isRunning: true,
+                    startEpoch: Date.now()
+                };
+                const remainingTime = Math.floor(Math.random() * 1500);
+                const progressState = calculateProgressState(mockTimerState, remainingTime);
+                
+                createCircularProgressBar(progressState, progressSettings, 120);
+                createLinearProgressBar(progressState, progressSettings, 300);
+            }
+            
+            console.timeEnd('プログレスバー生成テスト');
+            
+            performanceResult.style.display = 'block';
+            performanceResult.innerHTML = `
+                <strong>パフォーマンステスト結果:</strong><br>
+                ${iterations}回のプログレスバー生成を実行しました。<br>
+                詳細な結果はコンソールを確認してください。<br>
+                <span style="color: green;">✅ パフォーマンステスト完了</span>
+            `;
+        };
+
+        // メモリテスト
+        window.memoryTest = function() {
+            const performanceResult = document.getElementById('performance-result');
+            
+            if (performance.memory) {
+                const memoryInfo = {
+                    used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+                    total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+                    limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+                };
+                
+                performanceResult.style.display = 'block';
+                performanceResult.innerHTML = `
+                    <strong>メモリ使用量:</strong><br>
+                    使用中: ${memoryInfo.used} MB<br>
+                    合計: ${memoryInfo.total} MB<br>
+                    制限: ${memoryInfo.limit} MB<br>
+                    <span style="color: blue;">ℹ️ メモリ情報を取得しました</span>
+                `;
+            } else {
+                performanceResult.style.display = 'block';
+                performanceResult.innerHTML = `
+                    <span style="color: orange;">⚠️ このブラウザではメモリ情報を取得できません</span>
+                `;
+            }
+        };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('プログレスバーテストページが読み込まれました');
+            updateProgress();
+        });
+    </script>
+</body>
+</html> 
