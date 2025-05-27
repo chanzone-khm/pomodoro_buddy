@@ -24,6 +24,9 @@ export interface TimerState {
 export interface TimerSettings {
   workDurationSec: number; // 作業セッションの時間（秒）
   breakDurationSec: number; // 休憩セッションの時間（秒）
+  soundEnabled: boolean; // アラーム音を有効にするかどうか
+  workCompleteSound: string; // 作業完了音のファイルパス
+  breakCompleteSound: string; // 休憩完了音のファイルパス
 }
 
 /**
@@ -43,7 +46,9 @@ export enum MessageAction {
   STOP = 'stop',
   RESET = 'reset',
   GET_STATE = 'getState',
-  UPDATE_BADGE = 'updateBadge'
+  UPDATE_BADGE = 'updateBadge',
+  PLAY_SOUND = 'playSound',
+  UPDATE_SETTINGS = 'updateSettings'
 }
 
 /**

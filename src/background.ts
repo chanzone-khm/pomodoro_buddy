@@ -16,7 +16,8 @@ import {
   calculateRemainingTime,
   isTimerCompleted,
   calculateBadgeText
-} from './utils/timer';
+} from './utils/timer.js';
+import { playSessionCompleteSound } from './utils/audio.js';
 
 // 初期状態
 let currentState: TimerState = createTimerState();
@@ -95,6 +96,11 @@ function handleTimerComplete() {
   
   // セッション完了の通知
   showNotification(isWorkComplete);
+  
+  // アラーム音を再生
+  if (settings.soundEnabled) {
+    playSessionCompleteSound(currentState.type);
+  }
   
   // 次のセッションに切り替え
   currentState = switchSession(currentState, settings);
@@ -182,7 +188,7 @@ async function saveState() {
 /**
  * メッセージハンドラー
  */
-chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendResponse) => {
   const { action } = message;
   
   switch (action) {
@@ -211,6 +217,21 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
       
     case MessageAction.UPDATE_BADGE:
       updateBadge();
+      break;
+      
+    case MessageAction.PLAY_SOUND:
+      if (settings.soundEnabled && message.payload?.sessionType) {
+        playSessionCompleteSound(message.payload.sessionType);
+      }
+      break;
+      
+    case MessageAction.UPDATE_SETTINGS:
+      if (message.payload) {
+        settings = { ...settings, ...message.payload };
+        await chrome.storage.sync.set({
+          [StorageKey.TIMER_SETTINGS]: settings
+        });
+      }
       break;
   }
   

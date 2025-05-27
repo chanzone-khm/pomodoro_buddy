@@ -34,4 +34,16 @@
   .session-break {
     @apply bg-pomodoro-green/10 text-pomodoro-green;
   }
+  
+  .btn-small {
+    @apply px-2 py-1 text-xs rounded font-medium transition-colors duration-200;
+  }
+  
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  
+  .btn-small:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
 } 

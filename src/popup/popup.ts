@@ -1,5 +1,6 @@
-import { MessageAction, SessionType, TimerState } from '../types/index.js';
-import { formatTime } from '../utils/timer';
+import { MessageAction, SessionType, TimerState, TimerSettings } from '../types/index.js';
+import { formatTime } from '../utils/timer.js';
+import { playSessionCompleteSound } from '../utils/audio.js';
 
 // HTMLエレメントの取得
 const timerDisplay = document.getElementById('timer-display') as HTMLElement;
@@ -8,8 +9,16 @@ const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
+// 設定関連のエレメント
+const settingsToggle = document.getElementById('settings-toggle') as HTMLButtonElement;
+const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
+const soundEnabledCheckbox = document.getElementById('sound-enabled') as HTMLInputElement;
+const testWorkSoundBtn = document.getElementById('test-work-sound') as HTMLButtonElement;
+const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLButtonElement;
+
 // タイマーの状態
 let timerState: TimerState | null = null;
+let timerSettings: TimerSettings | null = null;
 let remainingTime = 0;
 let updateInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -25,8 +34,15 @@ async function initialize() {
   pauseBtn.addEventListener('click', handlePauseClick);
   resetBtn.addEventListener('click', handleResetClick);
   
+  // 設定関連のイベントリスナー
+  settingsToggle.addEventListener('click', handleSettingsToggle);
+  soundEnabledCheckbox.addEventListener('change', handleSoundEnabledChange);
+  testWorkSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Work));
+  testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
+  
   // 最初の表示更新
   updateDisplay();
+  updateSettingsDisplay();
   
   // 定期的に状態を更新
   startDisplayUpdate();
@@ -42,6 +58,7 @@ async function fetchTimerState() {
       (response) => {
         if (response) {
           timerState = response.state;
+          timerSettings = response.settings;
           remainingTime = response.remainingTime;
           resolve();
         }
@@ -127,6 +144,65 @@ function handleResetClick() {
   chrome.runtime.sendMessage({ action: MessageAction.RESET });
   startBtn.disabled = false;
   pauseBtn.disabled = true;
+}
+
+/**
+ * 設定パネルの表示/非表示を切り替える
+ */
+function handleSettingsToggle() {
+  settingsPanel.classList.toggle('hidden');
+}
+
+/**
+ * アラーム音設定の変更ハンドラー
+ */
+async function handleSoundEnabledChange() {
+  if (!timerSettings) return;
+  
+  const newSettings = {
+    ...timerSettings,
+    soundEnabled: soundEnabledCheckbox.checked
+  };
+  
+  // バックグラウンドに設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: newSettings
+  });
+  
+  // ローカルの設定も更新
+  timerSettings = newSettings;
+  
+  // テストボタンの状態を更新
+  updateTestButtonsState();
+}
+
+/**
+ * テスト音再生ハンドラー
+ */
+function handleTestSound(sessionType: SessionType) {
+  if (!timerSettings?.soundEnabled) return;
+  
+  playSessionCompleteSound(sessionType);
+}
+
+/**
+ * 設定表示を更新する
+ */
+function updateSettingsDisplay() {
+  if (!timerSettings) return;
+  
+  soundEnabledCheckbox.checked = timerSettings.soundEnabled;
+  updateTestButtonsState();
+}
+
+/**
+ * テストボタンの状態を更新する
+ */
+function updateTestButtonsState() {
+  const isEnabled = timerSettings?.soundEnabled || false;
+  testWorkSoundBtn.disabled = !isEnabled;
+  testBreakSoundBtn.disabled = !isEnabled;
 }
 
 // 初期化

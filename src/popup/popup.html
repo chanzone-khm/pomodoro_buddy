@@ -29,6 +29,35 @@
         リセット
       </button>
     </div>
+    
+    <!-- 設定セクション -->
+    <div class="mt-4 pt-4 border-t border-gray-200">
+      <button id="settings-toggle" class="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
+        <span>⚙️</span>
+        設定
+      </button>
+      
+      <div id="settings-panel" class="hidden mt-3 space-y-3">
+        <div class="flex items-center justify-between">
+          <label for="sound-enabled" class="text-sm text-gray-700">
+            アラーム音
+          </label>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="sound-enabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+        
+        <div class="flex gap-2">
+          <button id="test-work-sound" class="btn-small btn-secondary flex-1" disabled>
+            作業完了音テスト
+          </button>
+          <button id="test-break-sound" class="btn-small btn-secondary flex-1" disabled>
+            休憩完了音テスト
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="popup.ts"></script>

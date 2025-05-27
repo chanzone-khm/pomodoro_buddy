@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日付取得テスト</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            color: #856404;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕐 日付取得機能テスト</h1>
+        
+        <div class="test-section">
+            <h3>📅 ローカル日付取得</h3>
+            <p>ブラウザのローカル日付・時刻を取得します</p>
+            <button onclick="testLocalDate()">ローカル日付を取得</button>
+            <div id="local-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 外部API日付取得</h3>
+            <p>World Time APIから正確な日付・時刻を取得します</p>
+            <button onclick="testExternalDate()">外部API日付を取得</button>
+            <div id="external-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 信頼できる日付取得</h3>
+            <p>複数のソースから最も信頼できる日付を取得します</p>
+            <button onclick="testReliableDate()">信頼できる日付を取得</button>
+            <div id="reliable-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 バックログ用日付文字列</h3>
+            <p>バックログに記録するための日付文字列を生成します</p>
+            <button onclick="testBacklogDate()">バックログ用日付を取得</button>
+            <div id="backlog-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 全テスト実行</h3>
+            <p>すべての日付取得機能をまとめてテストします</p>
+            <button onclick="runAllTests()">全テスト実行</button>
+            <div id="all-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>💾 バックログ完了記録テスト</h3>
+            <p>バックログアイテムの完了を記録します</p>
+            <button onclick="testBacklogCompletion()">完了記録テスト</button>
+            <div id="completion-result" class="result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 日付ユーティリティをインポート
+        import { 
+            getCurrentDateInfo, 
+            getExternalDateInfo, 
+            getReliableDateInfo, 
+            getBacklogDateString 
+        } from './src/utils/date.js';
+        
+        import { 
+            testDateRetrieval, 
+            recordBacklogCompletion,
+            logCurrentDateInfo 
+        } from './src/utils/backlog.js';
+
+        // グローバルに関数を公開
+        window.testLocalDate = async function() {
+            const resultDiv = document.getElementById('local-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '取得中...';
+            
+            try {
+                const dateInfo = getCurrentDateInfo();
+                resultDiv.className = 'result success';
+                resultDiv.textContent = JSON.stringify(dateInfo, null, 2);
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        window.testExternalDate = async function() {
+            const resultDiv = document.getElementById('external-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '外部APIから取得中...';
+            
+            try {
+                const dateInfo = await getExternalDateInfo();
+                resultDiv.className = 'result success';
+                resultDiv.textContent = JSON.stringify(dateInfo, null, 2);
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        window.testReliableDate = async function() {
+            const resultDiv = document.getElementById('reliable-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '信頼できる日付を取得中...';
+            
+            try {
+                const dateInfo = await getReliableDateInfo();
+                resultDiv.className = 'result success';
+                resultDiv.textContent = JSON.stringify(dateInfo, null, 2);
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        window.testBacklogDate = async function() {
+            const resultDiv = document.getElementById('backlog-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = 'バックログ用日付を生成中...';
+            
+            try {
+                const dateString = await getBacklogDateString();
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `バックログ用日付文字列: ${dateString}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        window.runAllTests = async function() {
+            const resultDiv = document.getElementById('all-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '全テストを実行中...';
+            
+            try {
+                // コンソールに詳細ログを出力
+                await testDateRetrieval();
+                
+                // 結果をまとめて表示
+                const local = getCurrentDateInfo();
+                const external = await getExternalDateInfo();
+                const reliable = await getReliableDateInfo();
+                const backlogDate = await getBacklogDateString();
+                
+                const results = {
+                    ローカル日付: local,
+                    外部API日付: external,
+                    信頼できる日付: reliable,
+                    バックログ用日付: backlogDate
+                };
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = JSON.stringify(results, null, 2);
+                
+                console.log('全テスト完了:', results);
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        window.testBacklogCompletion = async function() {
+            const resultDiv = document.getElementById('completion-result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = 'バックログ完了記録をテスト中...';
+            
+            try {
+                const completionRecord = await recordBacklogCompletion(
+                    'PBI-TEST',
+                    '日付取得機能テスト',
+                    '日付取得ユーティリティの実装とテスト完了'
+                );
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `完了記録: ${completionRecord}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `エラー: ${error.message}`;
+            }
+        };
+
+        // ページ読み込み時に現在の日付情報をログ出力
+        window.addEventListener('load', async () => {
+            console.log('=== 日付取得テストページ読み込み完了 ===');
+            await logCurrentDateInfo();
+        });
+    </script>
+</body>
+</html> 

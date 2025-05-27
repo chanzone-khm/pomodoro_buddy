@@ -5,7 +5,10 @@ import { SessionType, TimerState, TimerSettings } from '../types/index.js';
  */
 export const DEFAULT_TIMER_SETTINGS: TimerSettings = {
   workDurationSec: 25 * 60, // 25分
-  breakDurationSec: 5 * 60  // 5分
+  breakDurationSec: 5 * 60, // 5分
+  soundEnabled: false, // デフォルトでは音を鳴らさない
+  workCompleteSound: 'sounds/work-complete.wav',
+  breakCompleteSound: 'sounds/break-complete.wav'
 };
 
 /**
