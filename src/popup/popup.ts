@@ -1,27 +1,38 @@
-import { MessageAction, SessionType, TimerState, TimerSettings } from '../types/index.js';
-import { formatTime } from '../utils/timer.js';
+import { MessageAction, SessionType, TimerSettings, TimerState } from '../types/index.js';
 import { playSessionCompleteSound } from '../utils/audio.js';
-import { 
-  calculateProgressState, 
-  createCircularProgressBar, 
-  createLinearProgressBar,
-  updateProgressBarElement,
-  loadProgressSettings,
-  saveProgressSettings,
-  DEFAULT_PROGRESS_SETTINGS,
-  type ProgressBarSettings,
-  type ProgressBarState
+import {
+    calculateCycleState,
+    DEFAULT_CYCLE_SETTINGS,
+    getCycleProgressText,
+    loadCycleSettings,
+    resetCycle,
+    saveCycleSettings,
+    type CycleSettings,
+    type CycleState
+} from '../utils/cycle.js';
+import {
+    calculateProgressState,
+    createCircularProgressBar,
+    createLinearProgressBar,
+    DEFAULT_PROGRESS_SETTINGS,
+    loadProgressSettings,
+    saveProgressSettings,
+    updateProgressBarElement,
+    type ProgressBarSettings,
+    type ProgressBarState
 } from '../utils/progress.js';
 import {
-  calculateCycleState,
-  resetCycle,
-  getCycleProgressText,
-  loadCycleSettings,
-  saveCycleSettings,
-  DEFAULT_CYCLE_SETTINGS,
-  type CycleSettings,
-  type CycleState
-} from '../utils/cycle.js';
+    calculateTimeStats,
+    DEBUG_TIME_OPTIONS,
+    DEFAULT_TIME_SETTINGS,
+    getTimeDisplayText,
+    loadTimeSettings,
+    NORMAL_TIME_OPTIONS,
+    saveTimeSettings,
+    toggleDebugMode,
+    type TimeSettings
+} from '../utils/time-settings.js';
+import { formatTime } from '../utils/timer.js';
 
 // HTMLエレメントの取得
 const timerDisplay = document.getElementById('timer-display') as HTMLElement;
@@ -49,6 +60,13 @@ const cycleCountSelect = document.getElementById('cycle-count') as HTMLSelectEle
 const longBreakIntervalSelect = document.getElementById('long-break-interval') as HTMLSelectElement;
 const resetCycleBtn = document.getElementById('reset-cycle') as HTMLButtonElement;
 
+// 時間設定関連のエレメント
+const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
+const workDurationSelect = document.getElementById('work-duration') as HTMLSelectElement;
+const shortBreakDurationSelect = document.getElementById('short-break-duration') as HTMLSelectElement;
+const longBreakDurationSelect = document.getElementById('long-break-duration') as HTMLSelectElement;
+const timeStatsDiv = document.getElementById('time-stats') as HTMLElement;
+
 // タイマーの状態
 let timerState: TimerState | null = null;
 let timerSettings: TimerSettings | null = null;
@@ -63,47 +81,60 @@ let currentProgressState: ProgressBarState | null = null;
 let cycleSettings: CycleSettings = DEFAULT_CYCLE_SETTINGS;
 let currentCycleState: CycleState | null = null;
 
+// 時間設定の状態
+let timeSettings: TimeSettings = DEFAULT_TIME_SETTINGS;
+
 /**
  * 初期化
  */
 async function initialize() {
   // 現在の状態を取得
   await fetchTimerState();
-  
+
   // プログレスバー設定を読み込み
   progressSettings = await loadProgressSettings();
-  
+
   // サイクル設定を読み込み
   cycleSettings = await loadCycleSettings();
-  
+
+  // 時間設定を読み込み
+  timeSettings = await loadTimeSettings();
+
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
   pauseBtn.addEventListener('click', handlePauseClick);
   resetBtn.addEventListener('click', handleResetClick);
-  
+
   // 設定関連のイベントリスナー
   settingsToggle.addEventListener('click', handleSettingsToggle);
   soundEnabledCheckbox.addEventListener('change', handleSoundEnabledChange);
   testWorkSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Work));
   testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
-  
+
   // プログレスバー関連のイベントリスナー
   progressEnabledCheckbox.addEventListener('change', handleProgressEnabledChange);
   progressTypeSelect.addEventListener('change', handleProgressTypeChange);
   progressPercentageCheckbox.addEventListener('change', handleProgressPercentageChange);
-  
+
   // サイクル関連のイベントリスナー
   cycleCountSelect.addEventListener('change', handleCycleCountChange);
   longBreakIntervalSelect.addEventListener('change', handleLongBreakIntervalChange);
   resetCycleBtn.addEventListener('click', handleResetCycle);
-  
+
+  // 時間設定関連のイベントリスナー
+  debugModeCheckbox.addEventListener('change', handleDebugModeChange);
+  workDurationSelect.addEventListener('change', handleWorkDurationChange);
+  shortBreakDurationSelect.addEventListener('change', handleShortBreakDurationChange);
+  longBreakDurationSelect.addEventListener('change', handleLongBreakDurationChange);
+
   // 最初の表示更新
   updateDisplay();
   updateSettingsDisplay();
   updateProgressSettingsDisplay();
   updateCycleSettingsDisplay();
+  updateTimeSettingsDisplay();
   updateProgressBar();
-  
+
   // 定期的に状態を更新
   startDisplayUpdate();
 }
@@ -132,10 +163,10 @@ async function fetchTimerState() {
  */
 function updateDisplay() {
   if (!timerState) return;
-  
+
   // 残り時間表示
   timerDisplay.textContent = formatTime(remainingTime);
-  
+
   // セッションタイプ表示
   if (timerState.type === SessionType.Work) {
     sessionIndicator.textContent = '作業中';
@@ -144,13 +175,13 @@ function updateDisplay() {
     sessionIndicator.textContent = '休憩中';
     sessionIndicator.className = 'session-indicator session-break';
   }
-  
+
   // サイクル進行状況を更新
   updateCycleDisplay();
-  
+
   // ボタン状態を更新
   updateButtonState();
-  
+
   // プログレスバーを更新
   updateProgressBar();
 }
@@ -160,7 +191,7 @@ function updateDisplay() {
  */
 function updateButtonState() {
   if (!timerState) return;
-  
+
   if (timerState.isRunning) {
     startBtn.disabled = true;
     pauseBtn.disabled = false;
@@ -177,7 +208,7 @@ function updateButtonState() {
  */
 function startDisplayUpdate() {
   if (updateInterval) clearInterval(updateInterval);
-  
+
   // 毎秒表示を更新
   updateInterval = setInterval(async () => {
     await fetchTimerState();
@@ -224,21 +255,21 @@ function handleSettingsToggle() {
  */
 async function handleSoundEnabledChange() {
   if (!timerSettings) return;
-  
+
   const newSettings = {
     ...timerSettings,
     soundEnabled: soundEnabledCheckbox.checked
   };
-  
+
   // バックグラウンドに設定を送信
   chrome.runtime.sendMessage({
     action: MessageAction.UPDATE_SETTINGS,
     payload: newSettings
   });
-  
+
   // ローカルの設定も更新
   timerSettings = newSettings;
-  
+
   // テストボタンの状態を更新
   updateTestButtonsState();
 }
@@ -248,7 +279,7 @@ async function handleSoundEnabledChange() {
  */
 function handleTestSound(sessionType: SessionType) {
   if (!timerSettings?.soundEnabled) return;
-  
+
   playSessionCompleteSound(sessionType);
 }
 
@@ -257,7 +288,7 @@ function handleTestSound(sessionType: SessionType) {
  */
 function updateSettingsDisplay() {
   if (!timerSettings) return;
-  
+
   soundEnabledCheckbox.checked = timerSettings.soundEnabled;
   updateTestButtonsState();
 }
@@ -276,18 +307,18 @@ function updateTestButtonsState() {
  */
 function updateProgressBar() {
   if (!timerState || !progressBarContainer) return;
-  
+
   // プログレスバーが無効の場合は非表示
   if (!progressSettings.enabled || !progressSettings || progressSettings.type === undefined) {
     progressBarContainer.style.display = 'none';
     return;
   }
-  
+
   progressBarContainer.style.display = 'block';
-  
+
   // プログレス状態を計算
   currentProgressState = calculateProgressState(timerState, remainingTime);
-  
+
   // プログレスバーのHTMLを生成
   let progressBarHTML = '';
   if (progressSettings.type === 'circular') {
@@ -295,7 +326,7 @@ function updateProgressBar() {
   } else {
     progressBarHTML = createLinearProgressBar(currentProgressState, progressSettings, 260);
   }
-  
+
   // 既存のプログレスバーがある場合は更新、ない場合は新規作成
   if (progressBarContainer.children.length > 0) {
     // 形式が変わった場合は完全に再生成
@@ -317,7 +348,7 @@ async function handleProgressEnabledChange() {
   const enabled = progressEnabledCheckbox.checked;
   progressSettings.enabled = enabled;
   await saveProgressSettings(progressSettings);
-  
+
   if (enabled) {
     progressBarContainer.style.display = 'block';
     updateProgressBar();
@@ -332,7 +363,7 @@ async function handleProgressEnabledChange() {
 async function handleProgressTypeChange() {
   progressSettings.type = progressTypeSelect.value as 'circular' | 'linear';
   await saveProgressSettings(progressSettings);
-  
+
   // プログレスバーを完全に再生成するためにコンテナをクリア
   progressBarContainer.innerHTML = '';
   updateProgressBar();
@@ -344,7 +375,7 @@ async function handleProgressTypeChange() {
 async function handleProgressPercentageChange() {
   progressSettings.showPercentage = progressPercentageCheckbox.checked;
   await saveProgressSettings(progressSettings);
-  
+
   // プログレスバーを完全に再生成するためにコンテナをクリア
   progressBarContainer.innerHTML = '';
   updateProgressBar();
@@ -364,10 +395,10 @@ function updateProgressSettingsDisplay() {
  */
 function updateCycleDisplay() {
   if (!timerState) return;
-  
+
   currentCycleState = calculateCycleState(cycleSettings, timerState.type);
   cycleProgress.textContent = getCycleProgressText(currentCycleState);
-  
+
   // 完了時の表示変更
   if (currentCycleState.isCompleted) {
     cycleProgress.className = 'cycle-progress bg-green-50 text-green-600';
@@ -391,6 +422,12 @@ async function handleCycleCountChange() {
   cycleSettings.totalCycles = parseInt(cycleCountSelect.value);
   await saveCycleSettings(cycleSettings);
   updateCycleDisplay();
+
+  // バックグラウンドに設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { cycleSettings }
+  });
 }
 
 /**
@@ -399,6 +436,12 @@ async function handleCycleCountChange() {
 async function handleLongBreakIntervalChange() {
   cycleSettings.longBreakInterval = parseInt(longBreakIntervalSelect.value);
   await saveCycleSettings(cycleSettings);
+
+  // バックグラウンドに設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { cycleSettings }
+  });
 }
 
 /**
@@ -408,7 +451,13 @@ async function handleResetCycle() {
   cycleSettings = resetCycle(cycleSettings);
   await saveCycleSettings(cycleSettings);
   updateCycleDisplay();
-  
+
+  // バックグラウンドに設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { cycleSettings }
+  });
+
   // 通知
   if (chrome.notifications) {
     chrome.notifications.create({
@@ -420,5 +469,133 @@ async function handleResetCycle() {
   }
 }
 
+/**
+ * 時間設定表示を更新する
+ */
+function updateTimeSettingsDisplay() {
+  debugModeCheckbox.checked = timeSettings.isDebugMode;
+
+  // 時間選択肢を更新
+  updateTimeOptions();
+
+  // 現在の値を設定
+  workDurationSelect.value = timeSettings.workDuration.toString();
+  shortBreakDurationSelect.value = timeSettings.shortBreakDuration.toString();
+  longBreakDurationSelect.value = timeSettings.longBreakDuration.toString();
+
+  // 統計情報を更新
+  updateTimeStats();
+}
+
+/**
+ * 時間選択肢を更新する
+ */
+function updateTimeOptions() {
+  const options = timeSettings.isDebugMode ? DEBUG_TIME_OPTIONS : NORMAL_TIME_OPTIONS;
+  const unit = timeSettings.isDebugMode ? '秒' : '分';
+
+  // 作業時間の選択肢
+  workDurationSelect.innerHTML = '';
+  options.work.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value.toString();
+    option.textContent = `${value}${unit}`;
+    workDurationSelect.appendChild(option);
+  });
+
+  // 短い休憩の選択肢
+  shortBreakDurationSelect.innerHTML = '';
+  options.shortBreak.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value.toString();
+    option.textContent = `${value}${unit}`;
+    shortBreakDurationSelect.appendChild(option);
+  });
+
+  // 長い休憩の選択肢
+  longBreakDurationSelect.innerHTML = '';
+  options.longBreak.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value.toString();
+    option.textContent = `${value}${unit}`;
+    longBreakDurationSelect.appendChild(option);
+  });
+}
+
+/**
+ * 時間統計を更新する
+ */
+function updateTimeStats() {
+  const stats = calculateTimeStats(timeSettings, cycleSettings.totalCycles);
+  const displayText = getTimeDisplayText(timeSettings);
+
+  timeStatsDiv.innerHTML = `
+    <div><strong>現在の設定:</strong></div>
+    <div>作業: ${displayText.workText} | 短い休憩: ${displayText.shortBreakText} | 長い休憩: ${displayText.longBreakText}</div>
+    <div class="mt-1"><strong>予想時間 (${cycleSettings.totalCycles}サイクル):</strong></div>
+    <div>作業: ${stats.totalWorkTime}${stats.unit} | 休憩: ${stats.totalBreakTime}${stats.unit} | 合計: ${stats.totalSessionTime}${stats.unit}</div>
+  `;
+}
+
+/**
+ * デバッグモード変更ハンドラー
+ */
+async function handleDebugModeChange() {
+  timeSettings = toggleDebugMode(timeSettings);
+  await saveTimeSettings(timeSettings);
+  updateTimeSettingsDisplay();
+
+  // タイマーに新しい設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { timeSettings }
+  });
+}
+
+/**
+ * 作業時間変更ハンドラー
+ */
+async function handleWorkDurationChange() {
+  timeSettings.workDuration = parseInt(workDurationSelect.value);
+  await saveTimeSettings(timeSettings);
+  updateTimeStats();
+
+  // タイマーに新しい設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { timeSettings }
+  });
+}
+
+/**
+ * 短い休憩時間変更ハンドラー
+ */
+async function handleShortBreakDurationChange() {
+  timeSettings.shortBreakDuration = parseInt(shortBreakDurationSelect.value);
+  await saveTimeSettings(timeSettings);
+  updateTimeStats();
+
+  // タイマーに新しい設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { timeSettings }
+  });
+}
+
+/**
+ * 長い休憩時間変更ハンドラー
+ */
+async function handleLongBreakDurationChange() {
+  timeSettings.longBreakDuration = parseInt(longBreakDurationSelect.value);
+  await saveTimeSettings(timeSettings);
+  updateTimeStats();
+
+  // タイマーに新しい設定を送信
+  chrome.runtime.sendMessage({
+    action: MessageAction.UPDATE_SETTINGS,
+    payload: { timeSettings }
+  });
+}
+
 // 初期化
-document.addEventListener('DOMContentLoaded', initialize); 
+document.addEventListener('DOMContentLoaded', initialize);

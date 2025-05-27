@@ -55,7 +55,62 @@ export function playBeepSound(frequency: number, duration: number, volume: numbe
  * セッションタイプに応じたアラーム音を再生
  * @param sessionType セッションタイプ
  */
-export function playSessionCompleteSound(sessionType: SessionType): void {
+export async function playSessionCompleteSound(sessionType: SessionType): Promise<void> {
+  try {
+    // オフスクリーンドキュメントを作成（まだ存在しない場合）
+    await ensureOffscreenDocument();
+    
+    // オフスクリーンドキュメントに音声再生を依頼
+    await chrome.runtime.sendMessage({
+      action: 'playSound',
+      sessionType: sessionType === SessionType.Work ? 'work' : 'break'
+    });
+  } catch (error) {
+    console.error('音声再生エラー:', error);
+    // フォールバック：直接ビープ音を試す
+    playSessionCompleteBeep(sessionType);
+  }
+}
+
+/**
+ * オフスクリーンドキュメントが存在することを確認
+ */
+async function ensureOffscreenDocument(): Promise<void> {
+  try {
+    // Chrome API の型定義の問題を回避するため any を使用
+    const chrome_any = chrome as any;
+    
+    // 既存のオフスクリーンドキュメントをチェック
+    if (chrome_any.runtime.getContexts) {
+      const existingContexts = await chrome_any.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT']
+      });
+
+      if (existingContexts && existingContexts.length > 0) {
+        return; // 既に存在する
+      }
+    }
+
+    // オフスクリーンドキュメントを作成
+    if (chrome_any.offscreen && chrome_any.offscreen.createDocument) {
+      await chrome_any.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: 'ポモドーロタイマーのアラーム音再生のため'
+      });
+    } else {
+      throw new Error('オフスクリーンAPI未対応');
+    }
+      } catch (error) {
+      console.error('オフスクリーンドキュメントの作成に失敗:', error);
+    }
+}
+
+/**
+ * ビープ音でセッション完了を通知
+ * @param sessionType セッションタイプ
+ */
+function playSessionCompleteBeep(sessionType: SessionType): void {
   if (sessionType === SessionType.Work) {
     // 作業完了音：高めの音、2回
     playBeepSound(800, 0.2);

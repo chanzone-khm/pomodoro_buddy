@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>デバッグ機能テスト</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button.success {
+            background-color: #28a745;
+        }
+        button.success:hover {
+            background-color: #218838;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        button.warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        button.warning:hover {
+            background-color: #e0a800;
+        }
+        .status-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .debug-mode {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .test-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+        .cycle-indicator {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .work-cycle {
+            color: #dc3545;
+        }
+        .short-break {
+            color: #28a745;
+        }
+        .long-break {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 デバッグ機能テスト</h1>
+        
+        <div class="debug-mode">
+            <strong>⚠️ デバッグモード専用</strong><br>
+            このページは長い休憩機能とアラーム音のテストを効率的に行うためのものです。
+        </div>
+
+        <div class="test-section">
+            <h3>🔊 アラーム音テスト</h3>
+            <div class="controls">
+                <button onclick="testWorkCompleteSound()" class="success">作業完了音テスト</button>
+                <button onclick="testBreakCompleteSound()" class="warning">休憩完了音テスト</button>
+                <button onclick="testBeepSound()" class="danger">ビープ音テスト</button>
+            </div>
+            
+            <div class="info">
+                <strong>テスト内容:</strong><br>
+                • 作業完了音: 高めの音、2回<br>
+                • 休憩完了音: 低めの音、3回<br>
+                • ビープ音: Web Audio API直接テスト
+            </div>
+            
+            <div id="audio-test-result" class="status-display" style="display: none;">
+                音声テスト結果がここに表示されます
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 長い休憩判定テスト</h3>
+            <div class="controls">
+                <label>
+                    現在のサイクル: 
+                    <select id="current-cycle">
+                        <option value="1">1回目</option>
+                        <option value="2">2回目</option>
+                        <option value="3">3回目</option>
+                        <option value="4" selected>4回目</option>
+                        <option value="5">5回目</option>
+                        <option value="6">6回目</option>
+                        <option value="7">7回目</option>
+                        <option value="8">8回目</option>
+                    </select>
+                </label>
+                
+                <label>
+                    長い休憩間隔: 
+                    <select id="long-break-interval">
+                        <option value="2">2回ごと</option>
+                        <option value="3">3回ごと</option>
+                        <option value="4" selected>4回ごと</option>
+                        <option value="5">5回ごと</option>
+                    </select>
+                </label>
+                
+                <button onclick="testLongBreakLogic()">判定テスト</button>
+            </div>
+            
+            <div class="grid">
+                <div class="test-card">
+                    <h4>現在の状態</h4>
+                    <div id="current-status" class="cycle-indicator work-cycle">
+                        4回目 作業中
+                    </div>
+                </div>
+                
+                <div class="test-card">
+                    <h4>次の休憩</h4>
+                    <div id="next-break-type" class="cycle-indicator long-break">
+                        長い休憩
+                    </div>
+                </div>
+                
+                <div class="test-card">
+                    <h4>休憩時間</h4>
+                    <div id="break-duration" class="cycle-indicator">
+                        30秒
+                    </div>
+                </div>
+            </div>
+            
+            <div id="long-break-result" class="status-display">
+                長い休憩判定結果がここに表示されます
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>⏱️ 統合テスト（デバッグモード）</h3>
+            <div class="controls">
+                <button onclick="startDebugCycle()" class="success">デバッグサイクル開始</button>
+                <button onclick="simulateWorkComplete()" class="warning">作業完了シミュレート</button>
+                <button onclick="simulateBreakComplete()" class="danger">休憩完了シミュレート</button>
+                <button onclick="resetDebugCycle()">リセット</button>
+            </div>
+            
+            <div class="info">
+                <strong>デバッグサイクル設定:</strong><br>
+                • 作業時間: 10秒<br>
+                • 短い休憩: 5秒<br>
+                • 長い休憩: 15秒<br>
+                • 長い休憩間隔: 2回ごと
+            </div>
+            
+            <div id="debug-cycle-status" class="status-display">
+                デバッグサイクル状態がここに表示されます
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 テスト結果ログ</h3>
+            <div class="controls">
+                <button onclick="clearLog()">ログクリア</button>
+                <button onclick="exportLog()">ログエクスポート</button>
+            </div>
+            <div id="test-log" class="status-display">
+                テストログがここに表示されます
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // テスト用の状態
+        let debugCycleState = {
+            currentCycle: 1,
+            totalCycles: 8,
+            longBreakInterval: 2,
+            isRunning: false,
+            sessionType: 'work'
+        };
+
+        let testLog = [];
+
+        // ログ関数
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            testLog.push(logEntry);
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            document.getElementById('test-log').textContent = testLog.join('\n');
+        }
+
+        // アラーム音テスト
+        window.testWorkCompleteSound = function() {
+            log('作業完了音テスト開始');
+            try {
+                playTestBeep(800, 0.2, 2);
+                log('✅ 作業完了音テスト成功');
+            } catch (error) {
+                log('❌ 作業完了音テスト失敗: ' + error.message);
+            }
+        };
+
+        window.testBreakCompleteSound = function() {
+            log('休憩完了音テスト開始');
+            try {
+                playTestBeep(400, 0.3, 3);
+                log('✅ 休憩完了音テスト成功');
+            } catch (error) {
+                log('❌ 休憩完了音テスト失敗: ' + error.message);
+            }
+        };
+
+        window.testBeepSound = function() {
+            log('ビープ音テスト開始');
+            try {
+                playTestBeep(600, 0.5, 1);
+                log('✅ ビープ音テスト成功');
+            } catch (error) {
+                log('❌ ビープ音テスト失敗: ' + error.message);
+            }
+        };
+
+        function playTestBeep(frequency, duration, count) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = 'sine';
+
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + duration);
+                }, i * 400);
+            }
+        }
+
+        // 長い休憩判定テスト
+        window.testLongBreakLogic = function() {
+            const currentCycle = parseInt(document.getElementById('current-cycle').value);
+            const longBreakInterval = parseInt(document.getElementById('long-break-interval').value);
+            
+            const isLongBreak = (currentCycle % longBreakInterval === 0);
+            const breakType = isLongBreak ? '長い休憩' : '短い休憩';
+            const breakDuration = isLongBreak ? '30秒' : '10秒';
+            
+            // 表示更新
+            document.getElementById('current-status').textContent = `${currentCycle}回目 作業中`;
+            document.getElementById('next-break-type').textContent = breakType;
+            document.getElementById('next-break-type').className = `cycle-indicator ${isLongBreak ? 'long-break' : 'short-break'}`;
+            document.getElementById('break-duration').textContent = breakDuration;
+            
+            // 結果表示
+            const result = `
+サイクル判定結果:
+- 現在のサイクル: ${currentCycle}回目
+- 長い休憩間隔: ${longBreakInterval}回ごと
+- 判定: ${currentCycle} % ${longBreakInterval} = ${currentCycle % longBreakInterval}
+- 結果: ${breakType} (${breakDuration})
+
+判定ロジック:
+${currentCycle} % ${longBreakInterval} === 0 → ${isLongBreak}
+            `;
+            
+            document.getElementById('long-break-result').textContent = result;
+            log(`長い休憩判定: ${currentCycle}回目 → ${breakType}`);
+        };
+
+        // デバッグサイクルテスト
+        window.startDebugCycle = function() {
+            debugCycleState = {
+                currentCycle: 1,
+                totalCycles: 8,
+                longBreakInterval: 2,
+                isRunning: true,
+                sessionType: 'work'
+            };
+            updateDebugCycleDisplay();
+            log('🚀 デバッグサイクル開始');
+        };
+
+        window.simulateWorkComplete = function() {
+            if (!debugCycleState.isRunning) {
+                log('❌ サイクルが開始されていません');
+                return;
+            }
+            
+            if (debugCycleState.sessionType !== 'work') {
+                log('❌ 現在は作業セッションではありません');
+                return;
+            }
+            
+            // 作業完了処理
+            const isLongBreak = (debugCycleState.currentCycle % debugCycleState.longBreakInterval === 0);
+            const breakType = isLongBreak ? '長い休憩' : '短い休憩';
+            
+            log(`✅ ${debugCycleState.currentCycle}回目作業完了 → ${breakType}開始`);
+            
+            // 音声テスト
+            testWorkCompleteSound();
+            
+            // 次の状態に移行
+            debugCycleState.sessionType = 'break';
+            debugCycleState.breakType = breakType;
+            updateDebugCycleDisplay();
+        };
+
+        window.simulateBreakComplete = function() {
+            if (!debugCycleState.isRunning) {
+                log('❌ サイクルが開始されていません');
+                return;
+            }
+            
+            if (debugCycleState.sessionType !== 'break') {
+                log('❌ 現在は休憩セッションではありません');
+                return;
+            }
+            
+            // 休憩完了処理
+            log(`✅ ${debugCycleState.breakType}完了 → 次の作業開始`);
+            
+            // 音声テスト
+            testBreakCompleteSound();
+            
+            // 次のサイクルに進む
+            debugCycleState.currentCycle++;
+            debugCycleState.sessionType = 'work';
+            
+            if (debugCycleState.currentCycle > debugCycleState.totalCycles) {
+                debugCycleState.isRunning = false;
+                log('🎉 全サイクル完了！');
+            }
+            
+            updateDebugCycleDisplay();
+        };
+
+        window.resetDebugCycle = function() {
+            debugCycleState = {
+                currentCycle: 1,
+                totalCycles: 8,
+                longBreakInterval: 2,
+                isRunning: false,
+                sessionType: 'work'
+            };
+            updateDebugCycleDisplay();
+            log('🔄 デバッグサイクルリセット');
+        };
+
+        function updateDebugCycleDisplay() {
+            const status = `
+デバッグサイクル状態:
+- 現在のサイクル: ${debugCycleState.currentCycle}/${debugCycleState.totalCycles}
+- セッション: ${debugCycleState.sessionType === 'work' ? '作業中' : `休憩中 (${debugCycleState.breakType || ''})`}
+- 実行状態: ${debugCycleState.isRunning ? '実行中' : '停止中'}
+- 長い休憩間隔: ${debugCycleState.longBreakInterval}回ごと
+
+次の予定:
+${debugCycleState.sessionType === 'work' 
+    ? `作業完了後 → ${(debugCycleState.currentCycle % debugCycleState.longBreakInterval === 0) ? '長い休憩' : '短い休憩'}`
+    : '休憩完了後 → 作業開始'
+}
+            `;
+            
+            document.getElementById('debug-cycle-status').textContent = status;
+        }
+
+        // ユーティリティ関数
+        window.clearLog = function() {
+            testLog = [];
+            updateLogDisplay();
+        };
+
+        window.exportLog = function() {
+            const logData = testLog.join('\n');
+            const blob = new Blob([logData], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pomodoro-debug-log.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🐛 デバッグ機能テストページ読み込み完了');
+            testLongBreakLogic();
+            updateDebugCycleDisplay();
+        });
+    </script>
+</body>
+</html> 

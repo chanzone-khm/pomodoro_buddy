@@ -19,7 +19,8 @@
   "permissions": [
     "storage",
     "notifications",
-    "alarms"
+    "alarms",
+    "offscreen"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -29,8 +30,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["sounds/*.wav"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "sounds/*.wav",
+        "offscreen.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
-} 
+}

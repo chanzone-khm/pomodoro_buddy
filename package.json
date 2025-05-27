@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "type-check": "tsc --noEmit",
+    "pre-build": "pnpm run type-check",
+    "build": "pnpm run pre-build && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest"
   },
