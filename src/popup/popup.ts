@@ -14,10 +14,8 @@ import {
 } from '../utils/progress.js';
 import {
   calculateCycleState,
-  advanceCycle,
   resetCycle,
   getCycleProgressText,
-  getCycleCompletionMessage,
   loadCycleSettings,
   saveCycleSettings,
   DEFAULT_CYCLE_SETTINGS,
