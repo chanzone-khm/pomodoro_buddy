@@ -126,12 +126,19 @@ export function shouldTakeLongBreak(
   settings: CycleSettings,
   currentSessionType: SessionType
 ): boolean {
-  // 作業セッション完了後で、長い休憩の間隔に達している場合
-  return (
-    currentSessionType === SessionType.Work &&
-    settings.currentCycle % settings.longBreakInterval === 0 &&
-    settings.currentCycle < settings.totalCycles
-  );
+  // 作業セッション完了後のみ判定
+  if (currentSessionType !== SessionType.Work) {
+    return false;
+  }
+
+  // 最後のサイクルでは休憩なし（全体完了）
+  if (settings.currentCycle >= settings.totalCycles) {
+    return false;
+  }
+
+  // 完了したサイクル数が長い休憩間隔の倍数の時に長い休憩
+  return settings.currentCycle > 0 &&
+         settings.currentCycle % settings.longBreakInterval === 0;
 }
 
 /**

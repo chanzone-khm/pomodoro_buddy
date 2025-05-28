@@ -152,6 +152,12 @@ async function fetchTimerState() {
           timerState = response.state;
           timerSettings = response.settings;
           remainingTime = response.remainingTime;
+
+          // サイクル設定も同期
+          if (response.cycleSettings) {
+            cycleSettings = response.cycleSettings;
+          }
+
           resolve();
         }
       }
@@ -174,8 +180,8 @@ function updateDisplay() {
     sessionIndicator.className = 'session-indicator session-work';
   } else {
     // 休憩中の場合、長い休憩かどうかを判定
-    const isLongBreak = shouldTakeLongBreak(cycleSettings, SessionType.Work) &&
-                       cycleSettings.currentCycle % cycleSettings.longBreakInterval === 0;
+    // shouldTakeLongBreak関数を使用して正確に判定
+    const isLongBreak = shouldTakeLongBreak(cycleSettings, SessionType.Work);
 
     if (isLongBreak) {
       sessionIndicator.textContent = '長い休憩中';

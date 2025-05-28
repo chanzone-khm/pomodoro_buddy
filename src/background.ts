@@ -300,7 +300,8 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
       sendResponse({
         state: currentState,
         settings: settings,
-        remainingTime: calculateRemainingTime(currentState)
+        remainingTime: calculateRemainingTime(currentState),
+        cycleSettings: cycleSettings
       });
       break;
 
