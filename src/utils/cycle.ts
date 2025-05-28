@@ -38,12 +38,17 @@ export const DEFAULT_CYCLE_SETTINGS: CycleSettings = {
 };
 
 /**
+ * 長い休憩間隔の設定オプション
+ */
+export const LONG_BREAK_INTERVAL_OPTIONS = [2, 3, 4, 5, 6, 7, 8] as const;
+
+/**
  * サイクル設定を検証
  */
 export function validateCycleSettings(settings: Partial<CycleSettings>): CycleSettings {
   return {
     totalCycles: Math.max(1, Math.min(10, settings.totalCycles || DEFAULT_CYCLE_SETTINGS.totalCycles)),
-    longBreakInterval: Math.max(2, Math.min(10, settings.longBreakInterval || DEFAULT_CYCLE_SETTINGS.longBreakInterval)),
+    longBreakInterval: Math.max(2, Math.min(8, settings.longBreakInterval || DEFAULT_CYCLE_SETTINGS.longBreakInterval)),
     currentCycle: Math.max(1, settings.currentCycle || DEFAULT_CYCLE_SETTINGS.currentCycle),
     isCompleted: settings.isCompleted || DEFAULT_CYCLE_SETTINGS.isCompleted
   };
@@ -58,7 +63,7 @@ export function calculateCycleState(
 ): CycleState {
   const isLastCycle = settings.currentCycle >= settings.totalCycles;
   const progressPercentage = Math.min(100, (settings.currentCycle / settings.totalCycles) * 100);
-  
+
   // 次のセッションタイプを決定
   let nextSessionType: SessionType | null = null;
   if (!isLastCycle) {
@@ -92,14 +97,14 @@ export function advanceCycle(
   if (currentSessionType === SessionType.Work) {
     const newCycle = settings.currentCycle + 1;
     const isCompleted = newCycle > settings.totalCycles;
-    
+
     return {
       ...settings,
       currentCycle: isCompleted ? settings.totalCycles : newCycle,
       isCompleted
     };
   }
-  
+
   return settings;
 }
 
@@ -146,11 +151,11 @@ export function getNextSessionText(state: CycleState): string {
   if (state.isCompleted) {
     return '全サイクル完了';
   }
-  
+
   if (!state.nextSessionType) {
     return '最終セッション';
   }
-  
+
   return state.nextSessionType === SessionType.Work ? '次: 作業' : '次: 休憩';
 }
 
@@ -161,11 +166,11 @@ export function getCycleCompletionMessage(state: CycleState): string {
   if (state.isCompleted) {
     return `🎉 おめでとうございます！${state.totalCycles}サイクルを完了しました！`;
   }
-  
+
   if (state.isLastCycle) {
     return `🔥 最終サイクルです！あと少しで完了です！`;
   }
-  
+
   return `✅ サイクル ${state.currentCycle - 1} 完了！次のサイクルに進みます。`;
 }
 
@@ -211,10 +216,10 @@ export function calculateCycleStats(settings: CycleSettings): {
   const completedCycles = Math.max(0, settings.currentCycle - 1);
   const remainingCycles = Math.max(0, settings.totalCycles - settings.currentCycle + 1);
   const completionRate = settings.totalCycles > 0 ? (completedCycles / settings.totalCycles) * 100 : 0;
-  
+
   return {
     completedCycles,
     remainingCycles,
     completionRate
   };
-} 
+}

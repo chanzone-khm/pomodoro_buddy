@@ -285,6 +285,14 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
 
     case MessageAction.RESET:
       currentState = resetTimer(currentState, settings);
+      // サイクル設定もリセット（作業セッションから開始）
+      cycleSettings = {
+        ...cycleSettings,
+        currentCycle: 1,
+        isCompleted: false
+      };
+      // 作業セッションに戻す
+      currentState = createTimerState(SessionType.Work, settings);
       stopTimerCheck();
       break;
 

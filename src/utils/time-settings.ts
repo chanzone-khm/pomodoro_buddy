@@ -38,7 +38,7 @@ export const DEBUG_TIME_OPTIONS = {
 export const NORMAL_TIME_OPTIONS = {
   work: [15, 20, 25, 30, 35, 40, 45, 50, 55, 60], // 15-60分
   shortBreak: [3, 5, 10, 15, 20, 25, 30], // 3-30分
-  longBreak: [10, 15, 20, 25, 30, 45, 60] // 10-60分
+  longBreak: [10, 15, 20, 25, 30] // 10-30分（PBI-004要件）
 };
 
 /**
@@ -62,7 +62,7 @@ export function validateTimeSettings(settings: Partial<TimeSettings>): TimeSetti
     return {
       workDuration: Math.max(5, Math.min(120, workDuration)), // 5-120分
       shortBreakDuration: Math.max(1, Math.min(60, shortBreakDuration)), // 1-60分
-      longBreakDuration: Math.max(5, Math.min(120, longBreakDuration)), // 5-120分
+      longBreakDuration: Math.max(10, Math.min(30, longBreakDuration)), // 10-30分（PBI-004要件）
       isDebugMode: false
     };
   }
@@ -152,7 +152,7 @@ export async function loadTimeSettings(): Promise<TimeSettings> {
  */
 export function toggleDebugMode(settings: TimeSettings): TimeSettings {
   const newSettings = { ...settings, isDebugMode: !settings.isDebugMode };
-  
+
   // デバッグモードに切り替える場合、デフォルト値を設定
   if (newSettings.isDebugMode) {
     return {
@@ -175,29 +175,33 @@ export function toggleDebugMode(settings: TimeSettings): TimeSettings {
 /**
  * 時間設定の統計情報を計算
  */
-export function calculateTimeStats(settings: TimeSettings, cycleCount: number): {
+export function calculateTimeStats(
+  settings: TimeSettings,
+  cycleCount: number,
+  longBreakInterval: number = 4
+): {
   totalWorkTime: number;
   totalBreakTime: number;
   totalSessionTime: number;
   unit: string;
 } {
   const { workDurationSeconds, shortBreakDurationSeconds, longBreakDurationSeconds } = convertToSeconds(settings);
-  
-  // 長い休憩の回数を計算（4回ごとと仮定）
-  const longBreakCount = Math.floor((cycleCount - 1) / 4);
+
+  // 長い休憩の回数を計算（動的な間隔を使用）
+  const longBreakCount = Math.floor((cycleCount - 1) / longBreakInterval);
   const shortBreakCount = cycleCount - 1 - longBreakCount;
-  
+
   const totalWorkTime = workDurationSeconds * cycleCount;
   const totalBreakTime = (shortBreakDurationSeconds * shortBreakCount) + (longBreakDurationSeconds * longBreakCount);
   const totalSessionTime = totalWorkTime + totalBreakTime;
-  
+
   const unit = settings.isDebugMode ? '秒' : '分';
   const divisor = settings.isDebugMode ? 1 : 60;
-  
+
   return {
     totalWorkTime: Math.round(totalWorkTime / divisor),
     totalBreakTime: Math.round(totalBreakTime / divisor),
     totalSessionTime: Math.round(totalSessionTime / divisor),
     unit
   };
-} 
+}

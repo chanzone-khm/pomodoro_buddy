@@ -7,6 +7,7 @@ import {
     loadCycleSettings,
     resetCycle,
     saveCycleSettings,
+    shouldTakeLongBreak,
     type CycleSettings,
     type CycleState
 } from '../utils/cycle.js';
@@ -167,13 +168,22 @@ function updateDisplay() {
   // 残り時間表示
   timerDisplay.textContent = formatTime(remainingTime);
 
-  // セッションタイプ表示
+  // セッションタイプ表示（長い休憩の判定を含む）
   if (timerState.type === SessionType.Work) {
     sessionIndicator.textContent = '作業中';
     sessionIndicator.className = 'session-indicator session-work';
   } else {
-    sessionIndicator.textContent = '休憩中';
-    sessionIndicator.className = 'session-indicator session-break';
+    // 休憩中の場合、長い休憩かどうかを判定
+    const isLongBreak = shouldTakeLongBreak(cycleSettings, SessionType.Work) &&
+                       cycleSettings.currentCycle % cycleSettings.longBreakInterval === 0;
+
+    if (isLongBreak) {
+      sessionIndicator.textContent = '長い休憩中';
+      sessionIndicator.className = 'session-indicator session-long-break';
+    } else {
+      sessionIndicator.textContent = '短い休憩中';
+      sessionIndicator.className = 'session-indicator session-break';
+    }
   }
 
   // サイクル進行状況を更新
@@ -422,6 +432,7 @@ async function handleCycleCountChange() {
   cycleSettings.totalCycles = parseInt(cycleCountSelect.value);
   await saveCycleSettings(cycleSettings);
   updateCycleDisplay();
+  updateTimeStats();
 
   // バックグラウンドに設定を送信
   chrome.runtime.sendMessage({
@@ -436,6 +447,7 @@ async function handleCycleCountChange() {
 async function handleLongBreakIntervalChange() {
   cycleSettings.longBreakInterval = parseInt(longBreakIntervalSelect.value);
   await saveCycleSettings(cycleSettings);
+  updateTimeStats();
 
   // バックグラウンドに設定を送信
   chrome.runtime.sendMessage({
@@ -526,7 +538,7 @@ function updateTimeOptions() {
  * 時間統計を更新する
  */
 function updateTimeStats() {
-  const stats = calculateTimeStats(timeSettings, cycleSettings.totalCycles);
+  const stats = calculateTimeStats(timeSettings, cycleSettings.totalCycles, cycleSettings.longBreakInterval);
   const displayText = getTimeDisplayText(timeSettings);
 
   timeStatsDiv.innerHTML = `
@@ -534,6 +546,7 @@ function updateTimeStats() {
     <div>作業: ${displayText.workText} | 短い休憩: ${displayText.shortBreakText} | 長い休憩: ${displayText.longBreakText}</div>
     <div class="mt-1"><strong>予想時間 (${cycleSettings.totalCycles}サイクル):</strong></div>
     <div>作業: ${stats.totalWorkTime}${stats.unit} | 休憩: ${stats.totalBreakTime}${stats.unit} | 合計: ${stats.totalSessionTime}${stats.unit}</div>
+    <div class="mt-1 text-xs text-gray-500">長い休憩: ${cycleSettings.longBreakInterval}回ごと</div>
   `;
 }
 
@@ -550,6 +563,9 @@ async function handleDebugModeChange() {
     action: MessageAction.UPDATE_SETTINGS,
     payload: { timeSettings }
   });
+
+  // デバッグモード切り替え時にタイマーを自動リセット
+  chrome.runtime.sendMessage({ action: MessageAction.RESET });
 }
 
 /**
@@ -565,6 +581,9 @@ async function handleWorkDurationChange() {
     action: MessageAction.UPDATE_SETTINGS,
     payload: { timeSettings }
   });
+
+  // 時間設定変更時にタイマーを自動リセット
+  chrome.runtime.sendMessage({ action: MessageAction.RESET });
 }
 
 /**
@@ -580,6 +599,9 @@ async function handleShortBreakDurationChange() {
     action: MessageAction.UPDATE_SETTINGS,
     payload: { timeSettings }
   });
+
+  // 時間設定変更時にタイマーを自動リセット
+  chrome.runtime.sendMessage({ action: MessageAction.RESET });
 }
 
 /**
@@ -595,6 +617,9 @@ async function handleLongBreakDurationChange() {
     action: MessageAction.UPDATE_SETTINGS,
     payload: { timeSettings }
   });
+
+  // 時間設定変更時にタイマーを自動リセット
+  chrome.runtime.sendMessage({ action: MessageAction.RESET });
 }
 
 // 初期化

@@ -3,89 +3,93 @@
 @tailwind utilities;
 
 @layer components {
-  .btn {
-    @apply px-4 py-2 rounded font-semibold text-white transition-colors duration-200;
-  }
-  
-  .btn-primary {
-    @apply bg-pomodoro-red hover:bg-red-600;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-500 hover:bg-gray-600;
-  }
-  
-  .btn-success {
-    @apply bg-pomodoro-green hover:bg-green-600;
-  }
-  
-  .timer-display {
-    @apply text-4xl font-bold text-center py-4;
-  }
-  
-  .session-indicator {
-    @apply text-sm font-medium text-center py-1 px-2 rounded-full;
-  }
-  
-  .session-work {
-    @apply bg-pomodoro-red/10 text-pomodoro-red;
-  }
-  
-  .session-break {
-    @apply bg-pomodoro-green/10 text-pomodoro-green;
-  }
-  
-  .cycle-progress {
-    @apply text-xs font-medium text-center py-1 px-2 rounded-full bg-blue-50 text-blue-600;
-  }
-  
-  .btn-small {
-    @apply px-2 py-1 text-xs rounded font-medium transition-colors duration-200;
-  }
-  
-  .btn:disabled {
-    @apply opacity-50 cursor-not-allowed;
-  }
-  
-  .btn-small:disabled {
-    @apply opacity-50 cursor-not-allowed;
-  }
-  
-  /* プログレスバー関連のスタイル */
-  .progress-bar-container {
-    @apply flex items-center justify-center;
-  }
-  
-  .circular-progress-container {
-    @apply relative flex items-center justify-center;
-  }
-  
-  .circular-progress-svg {
-    @apply transform -rotate-90;
-  }
-  
-  .linear-progress-container {
-    @apply w-full;
-  }
-  
-  .linear-progress-track {
-    @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
-  }
-  
-  .linear-progress-bar {
-    @apply h-full rounded-full transition-all duration-500 ease-in-out;
-  }
-  
-  .progress-percentage {
-    @apply absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-600;
-  }
-  
-  /* プログレスバーのアニメーション */
-  .progress-bar-container .circular-progress-svg circle {
-    transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.3s ease-in-out;
-  }
-  
-  .progress-bar-container .linear-progress-bar {
-    transition: width 0.5s ease-in-out, background-color 0.3s ease-in-out;
-  }
-} 
+	.btn {
+		@apply px-4 py-2 rounded font-semibold text-white transition-colors duration-200;
+	}
+
+	.btn-primary {
+		@apply bg-pomodoro-red hover:bg-red-600;
+	}
+
+	.btn-secondary {
+		@apply bg-gray-500 hover:bg-gray-600;
+	}
+
+	.btn-success {
+		@apply bg-pomodoro-green hover:bg-green-600;
+	}
+
+	.timer-display {
+		@apply text-4xl font-bold text-center py-4;
+	}
+
+	.session-indicator {
+		@apply text-sm font-medium text-center py-1 px-2 rounded-full;
+	}
+
+	.session-work {
+		@apply bg-pomodoro-red/10 text-pomodoro-red;
+	}
+
+	.session-break {
+		@apply bg-pomodoro-green/10 text-pomodoro-green;
+	}
+
+	.session-long-break {
+		@apply bg-blue-100 text-blue-700;
+	}
+
+	.cycle-progress {
+		@apply text-xs font-medium text-center py-1 px-2 rounded-full bg-blue-50 text-blue-600;
+	}
+
+	.btn-small {
+		@apply px-2 py-1 text-xs rounded font-medium transition-colors duration-200;
+	}
+
+	.btn:disabled {
+		@apply opacity-50 cursor-not-allowed;
+	}
+
+	.btn-small:disabled {
+		@apply opacity-50 cursor-not-allowed;
+	}
+
+	/* プログレスバー関連のスタイル */
+	.progress-bar-container {
+		@apply flex items-center justify-center;
+	}
+
+	.circular-progress-container {
+		@apply relative flex items-center justify-center;
+	}
+
+	.circular-progress-svg {
+		@apply transform -rotate-90;
+	}
+
+	.linear-progress-container {
+		@apply w-full;
+	}
+
+	.linear-progress-track {
+		@apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+	}
+
+	.linear-progress-bar {
+		@apply h-full rounded-full transition-all duration-500 ease-in-out;
+	}
+
+	.progress-percentage {
+		@apply absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-600;
+	}
+
+	/* プログレスバーのアニメーション */
+	.progress-bar-container .circular-progress-svg circle {
+		transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.3s ease-in-out;
+	}
+
+	.progress-bar-container .linear-progress-bar {
+		transition: width 0.5s ease-in-out, background-color 0.3s ease-in-out;
+	}
+}
