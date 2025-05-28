@@ -1,34 +1,38 @@
 import {
-    Message,
-    MessageAction,
-    SessionType,
-    StorageKey,
-    TimerSettings,
-    TimerState
+  Message,
+  MessageAction,
+  SessionType,
+  StorageKey,
+  TimerSettings,
+  TimerState
 } from './types/index.js';
 import { playSessionCompleteSound } from './utils/audio.js';
 import {
-    advanceCycle,
-    DEFAULT_CYCLE_SETTINGS,
-    loadCycleSettings,
-    shouldTakeLongBreak,
-    type CycleSettings
+  advanceCycle,
+  DEFAULT_CYCLE_SETTINGS,
+  loadCycleSettings,
+  shouldTakeLongBreak,
+  type CycleSettings
 } from './utils/cycle.js';
 import {
-    convertToSeconds,
-    DEFAULT_TIME_SETTINGS,
-    loadTimeSettings,
-    type TimeSettings
+  getCurrentTask,
+  incrementTaskPomodoro
+} from './utils/tasks.js';
+import {
+  convertToSeconds,
+  DEFAULT_TIME_SETTINGS,
+  loadTimeSettings,
+  type TimeSettings
 } from './utils/time-settings.js';
 import {
-    calculateBadgeText,
-    calculateRemainingTime,
-    createTimerState,
-    DEFAULT_TIMER_SETTINGS,
-    isTimerCompleted,
-    pauseTimer,
-    resetTimer,
-    startTimer
+  calculateBadgeText,
+  calculateRemainingTime,
+  createTimerState,
+  DEFAULT_TIMER_SETTINGS,
+  isTimerCompleted,
+  pauseTimer,
+  resetTimer,
+  startTimer
 } from './utils/timer.js';
 
 // 初期状態
@@ -116,6 +120,18 @@ function checkTimerState() {
  */
 async function handleTimerComplete() {
   const isWorkComplete = currentState.type === SessionType.Work;
+
+  // 作業完了時は現在のタスクのポモドーロ数を増加
+  if (isWorkComplete) {
+    try {
+      const currentTask = await getCurrentTask();
+      if (currentTask) {
+        await incrementTaskPomodoro(currentTask.id);
+      }
+    } catch (error) {
+      console.error('タスクのポモドーロ数更新エラー:', error);
+    }
+  }
 
   // セッション完了の通知
   showNotification(isWorkComplete);

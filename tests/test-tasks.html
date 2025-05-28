@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タスク管理機能テスト - Pomodoro Buddy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .task-item {
+            @apply flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200 hover:bg-gray-100 transition-colors duration-200;
+        }
+
+        .task-item.task-pending {
+            @apply border-gray-300;
+        }
+
+        .task-item.task-in-progress {
+            @apply border-blue-300 bg-blue-50;
+        }
+
+        .task-item.task-completed {
+            @apply border-green-300 bg-green-50;
+        }
+
+        .task-name {
+            @apply text-sm font-medium text-gray-800 truncate flex-1;
+        }
+
+        .task-item.task-completed .task-name {
+            @apply line-through text-gray-500;
+        }
+
+        .task-actions {
+            @apply flex gap-2 ml-3;
+        }
+
+        .task-action-btn {
+            @apply px-2 py-1 text-xs rounded font-medium transition-colors duration-200;
+        }
+
+        .task-action-btn.start {
+            @apply bg-blue-100 text-blue-600 hover:bg-blue-200;
+        }
+
+        .task-action-btn.complete {
+            @apply bg-green-100 text-green-600 hover:bg-green-200;
+        }
+
+        .task-action-btn.edit {
+            @apply bg-gray-100 text-gray-600 hover:bg-gray-200;
+        }
+
+        .task-action-btn.delete {
+            @apply bg-red-100 text-red-600 hover:bg-red-200;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">タスク管理機能テスト</h1>
+
+        <!-- テスト結果表示 -->
+        <div id="test-results" class="mb-6 p-4 bg-white rounded-lg shadow">
+            <h2 class="text-lg font-semibold mb-3">テスト結果</h2>
+            <div id="test-output" class="space-y-2 text-sm"></div>
+        </div>
+
+        <!-- タスク作成フォーム -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">新しいタスクを作成</h2>
+            <form id="task-form" class="space-y-4">
+                <div>
+                    <label for="task-name" class="block text-sm font-medium text-gray-700 mb-1">
+                        タスク名 <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="task-name"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="タスク名を入力..." required>
+                </div>
+                <div>
+                    <label for="task-description" class="block text-sm font-medium text-gray-700 mb-1">
+                        説明（オプション）
+                    </label>
+                    <textarea id="task-description" rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="タスクの詳細説明..."></textarea>
+                </div>
+                <div>
+                    <label for="estimated-pomodoros" class="block text-sm font-medium text-gray-700 mb-1">
+                        予想ポモドーロ数（オプション）
+                    </label>
+                    <select id="estimated-pomodoros"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">未設定</option>
+                        <option value="1">1回</option>
+                        <option value="2">2回</option>
+                        <option value="3">3回</option>
+                        <option value="4">4回</option>
+                        <option value="5">5回</option>
+                        <option value="6">6回</option>
+                        <option value="7">7回</option>
+                        <option value="8">8回</option>
+                        <option value="9">9回</option>
+                        <option value="10">10回</option>
+                    </select>
+                </div>
+                <button type="submit"
+                    class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    タスクを作成
+                </button>
+            </form>
+        </div>
+
+        <!-- 現在のタスク表示 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">現在のタスク</h2>
+            <div id="current-task-display" class="text-center py-4">
+                <div id="current-task-info" class="hidden">
+                    <div id="current-task-name" class="text-lg font-medium text-gray-800 mb-2"></div>
+                    <div id="current-task-description" class="text-sm text-gray-600 mb-2"></div>
+                    <div id="current-task-pomodoros" class="text-sm text-gray-500"></div>
+                </div>
+                <div id="no-current-task" class="text-gray-500">
+                    現在のタスクが設定されていません
+                </div>
+            </div>
+        </div>
+
+        <!-- タスクリスト -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">タスクリスト</h2>
+                <button id="refresh-tasks"
+                    class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    更新
+                </button>
+            </div>
+            <div id="task-list" class="space-y-3">
+                <!-- タスクがここに表示されます -->
+            </div>
+        </div>
+
+        <!-- タスク統計 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">タスク統計</h2>
+            <div id="task-stats" class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                <!-- 統計がここに表示されます -->
+            </div>
+        </div>
+
+        <!-- テストボタン -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">機能テスト</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button id="test-create-task" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    サンプルタスク作成
+                </button>
+                <button id="test-task-operations"
+                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                    タスク操作テスト
+                </button>
+                <button id="test-storage" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                    ストレージテスト
+                </button>
+                <button id="clear-all-tasks" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    全タスク削除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Chrome拡張機能のモック（テスト用）
+        if (!window.chrome) {
+            window.chrome = {
+                storage: {
+                    sync: {
+                        get: async (keys) => {
+                            const data = {};
+                            if (typeof keys === 'string') {
+                                data[keys] = JSON.parse(localStorage.getItem(keys) || 'null');
+                            } else if (Array.isArray(keys)) {
+                                keys.forEach(key => {
+                                    data[key] = JSON.parse(localStorage.getItem(key) || 'null');
+                                });
+                            } else if (typeof keys === 'object') {
+                                Object.keys(keys).forEach(key => {
+                                    data[key] = JSON.parse(localStorage.getItem(key) || JSON.stringify(keys[key]));
+                                });
+                            }
+                            return data;
+                        },
+                        set: async (data) => {
+                            Object.keys(data).forEach(key => {
+                                localStorage.setItem(key, JSON.stringify(data[key]));
+                            });
+                        }
+                    }
+                }
+            };
+        }
+
+        // タスク管理機能のテスト
+        import('../src/utils/tasks.js').then(async (tasksModule) => {
+            const {
+                createTask,
+                getAllTasks,
+                saveTask,
+                deleteTask,
+                updateTask,
+                startTask,
+                completeTask,
+                incrementTaskPomodoro,
+                getCurrentTask,
+                setCurrentTask,
+                getTaskSettings,
+                saveTaskSettings,
+                getTaskStatistics
+            } = tasksModule;
+
+            // TaskStatusの定義
+            const TaskStatus = {
+                Pending: 'pending',
+                InProgress: 'in-progress',
+                Completed: 'completed'
+            };
+
+            let allTasks = [];
+            let currentTask = null;
+
+            // テスト結果を表示する関数
+            function addTestResult(message, isSuccess = true) {
+                const output = document.getElementById('test-output');
+                const div = document.createElement('div');
+                div.className = `p-2 rounded ${isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+                div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+                output.appendChild(div);
+                output.scrollTop = output.scrollHeight;
+            }
+
+            // タスクリストを更新
+            async function updateTaskList() {
+                allTasks = await getAllTasks();
+                const taskList = document.getElementById('task-list');
+                taskList.innerHTML = '';
+
+                if (allTasks.length === 0) {
+                    const emptyMessage = document.createElement('div');
+                    emptyMessage.className = 'text-center text-gray-500 py-8';
+                    emptyMessage.textContent = 'タスクがありません';
+                    taskList.appendChild(emptyMessage);
+                    return;
+                }
+
+                allTasks.forEach(task => {
+                    const taskItem = createTaskItem(task);
+                    taskList.appendChild(taskItem);
+                });
+            }
+
+            // タスクアイテムを作成
+            function createTaskItem(task) {
+                const taskItem = document.createElement('div');
+                taskItem.className = `task-item task-${task.status}`;
+
+                const taskInfo = document.createElement('div');
+                taskInfo.className = 'flex-1 min-w-0';
+
+                const taskName = document.createElement('div');
+                taskName.className = 'task-name';
+                taskName.textContent = task.name;
+
+                const taskMeta = document.createElement('div');
+                taskMeta.className = 'text-xs text-gray-500 mt-1';
+                taskMeta.textContent = `状態: ${getStatusText(task.status)} | ポモドーロ: ${task.pomodoroCount}`;
+                if (task.estimatedPomodoros) {
+                    taskMeta.textContent += `/${task.estimatedPomodoros}`;
+                }
+
+                taskInfo.appendChild(taskName);
+                if (task.description) {
+                    const taskDesc = document.createElement('div');
+                    taskDesc.className = 'text-xs text-gray-600 mt-1';
+                    taskDesc.textContent = task.description;
+                    taskInfo.appendChild(taskDesc);
+                }
+                taskInfo.appendChild(taskMeta);
+
+                const taskActions = document.createElement('div');
+                taskActions.className = 'task-actions';
+
+                // アクションボタン
+                if (task.status === TaskStatus.Pending) {
+                    const startBtn = createActionButton('開始', 'start', () => handleTaskStart(task.id));
+                    taskActions.appendChild(startBtn);
+                } else if (task.status === TaskStatus.InProgress) {
+                    const completeBtn = createActionButton('完了', 'complete', () => handleTaskComplete(task.id));
+                    taskActions.appendChild(completeBtn);
+                }
+
+                const editBtn = createActionButton('編集', 'edit', () => handleTaskEdit(task));
+                const deleteBtn = createActionButton('削除', 'delete', () => handleTaskDelete(task.id));
+
+                taskActions.appendChild(editBtn);
+                taskActions.appendChild(deleteBtn);
+
+                taskItem.appendChild(taskInfo);
+                taskItem.appendChild(taskActions);
+
+                return taskItem;
+            }
+
+            // アクションボタンを作成
+            function createActionButton(text, className, onClick) {
+                const button = document.createElement('button');
+                button.className = `task-action-btn ${className}`;
+                button.textContent = text;
+                button.addEventListener('click', onClick);
+                return button;
+            }
+
+            // ステータステキストを取得
+            function getStatusText(status) {
+                switch (status) {
+                    case TaskStatus.Pending:
+                        return '待機中';
+                    case TaskStatus.InProgress:
+                        return '進行中';
+                    case TaskStatus.Completed:
+                        return '完了';
+                    default:
+                        return '不明';
+                }
+            }
+
+            // 現在のタスク表示を更新
+            async function updateCurrentTaskDisplay() {
+                currentTask = await getCurrentTask();
+                const currentTaskInfo = document.getElementById('current-task-info');
+                const noCurrentTask = document.getElementById('no-current-task');
+
+                if (currentTask) {
+                    document.getElementById('current-task-name').textContent = currentTask.name;
+                    document.getElementById('current-task-description').textContent = currentTask.description || '';
+                    document.getElementById('current-task-pomodoros').textContent =
+                        `ポモドーロ: ${currentTask.pomodoroCount}${currentTask.estimatedPomodoros ? `/${currentTask.estimatedPomodoros}` : ''}`;
+
+                    currentTaskInfo.classList.remove('hidden');
+                    noCurrentTask.classList.add('hidden');
+                } else {
+                    currentTaskInfo.classList.add('hidden');
+                    noCurrentTask.classList.remove('hidden');
+                }
+            }
+
+            // タスク統計を更新
+            async function updateTaskStats() {
+                const stats = await getTaskStatistics();
+                const taskStats = document.getElementById('task-stats');
+
+                taskStats.innerHTML = `
+                    <div class="bg-blue-50 p-3 rounded">
+                        <div class="text-2xl font-bold text-blue-600">${stats.total}</div>
+                        <div class="text-sm text-blue-600">総タスク</div>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded">
+                        <div class="text-2xl font-bold text-yellow-600">${stats.pending}</div>
+                        <div class="text-sm text-yellow-600">待機中</div>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded">
+                        <div class="text-2xl font-bold text-blue-600">${stats.inProgress}</div>
+                        <div class="text-sm text-blue-600">進行中</div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded">
+                        <div class="text-2xl font-bold text-green-600">${stats.completed}</div>
+                        <div class="text-sm text-green-600">完了</div>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded">
+                        <div class="text-2xl font-bold text-red-600">${stats.totalPomodoros}</div>
+                        <div class="text-sm text-red-600">総ポモドーロ</div>
+                    </div>
+                `;
+            }
+
+            // 全体の表示を更新
+            async function updateDisplay() {
+                await updateTaskList();
+                await updateCurrentTaskDisplay();
+                await updateTaskStats();
+            }
+
+            // タスク開始ハンドラー
+            async function handleTaskStart(taskId) {
+                try {
+                    await startTask(taskId);
+                    await setCurrentTask(taskId);
+                    addTestResult(`タスクを開始しました: ${taskId}`);
+                    await updateDisplay();
+                } catch (error) {
+                    addTestResult(`タスク開始エラー: ${error.message}`, false);
+                }
+            }
+
+            // タスク完了ハンドラー
+            async function handleTaskComplete(taskId) {
+                try {
+                    await completeTask(taskId);
+                    addTestResult(`タスクを完了しました: ${taskId}`);
+                    await updateDisplay();
+                } catch (error) {
+                    addTestResult(`タスク完了エラー: ${error.message}`, false);
+                }
+            }
+
+            // タスク編集ハンドラー
+            function handleTaskEdit(task) {
+                document.getElementById('task-name').value = task.name;
+                document.getElementById('task-description').value = task.description || '';
+                document.getElementById('estimated-pomodoros').value = task.estimatedPomodoros || '';
+                addTestResult(`タスクを編集モードにしました: ${task.name}`);
+            }
+
+            // タスク削除ハンドラー
+            async function handleTaskDelete(taskId) {
+                if (confirm('このタスクを削除しますか？')) {
+                    try {
+                        await deleteTask(taskId);
+                        addTestResult(`タスクを削除しました: ${taskId}`);
+                        await updateDisplay();
+                    } catch (error) {
+                        addTestResult(`タスク削除エラー: ${error.message}`, false);
+                    }
+                }
+            }
+
+            // イベントリスナーの設定
+            document.getElementById('task-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('task-name').value.trim();
+                const description = document.getElementById('task-description').value.trim();
+                const estimatedPomodoros = document.getElementById('estimated-pomodoros').value;
+
+                if (!name) {
+                    addTestResult('タスク名を入力してください', false);
+                    return;
+                }
+
+                try {
+                    const newTask = createTask(
+                        name,
+                        description || undefined,
+                        estimatedPomodoros ? parseInt(estimatedPomodoros) : undefined
+                    );
+
+                    await saveTask(newTask);
+                    addTestResult(`新しいタスクを作成しました: ${name}`);
+
+                    // フォームをリセット
+                    document.getElementById('task-form').reset();
+
+                    await updateDisplay();
+                } catch (error) {
+                    addTestResult(`タスク作成エラー: ${error.message}`, false);
+                }
+            });
+
+            document.getElementById('refresh-tasks').addEventListener('click', async () => {
+                await updateDisplay();
+                addTestResult('タスクリストを更新しました');
+            });
+
+            document.getElementById('test-create-task').addEventListener('click', async () => {
+                try {
+                    const sampleTasks = [
+                        { name: 'サンプルタスク1', description: 'これはテスト用のタスクです', estimatedPomodoros: 2 },
+                        { name: 'サンプルタスク2', description: 'もう一つのテストタスク', estimatedPomodoros: 3 },
+                        { name: 'サンプルタスク3', description: '', estimatedPomodoros: 1 }
+                    ];
+
+                    for (const taskData of sampleTasks) {
+                        const task = createTask(taskData.name, taskData.description, taskData.estimatedPomodoros);
+                        await saveTask(task);
+                    }
+
+                    addTestResult('サンプルタスクを作成しました');
+                    await updateDisplay();
+                } catch (error) {
+                    addTestResult(`サンプルタスク作成エラー: ${error.message}`, false);
+                }
+            });
+
+            document.getElementById('test-task-operations').addEventListener('click', async () => {
+                try {
+                    // タスク操作のテスト
+                    const testTask = createTask('テスト操作タスク', 'タスク操作をテストします', 2);
+                    await saveTask(testTask);
+                    addTestResult('テストタスクを作成');
+
+                    await startTask(testTask.id);
+                    addTestResult('テストタスクを開始');
+
+                    await incrementTaskPomodoro(testTask.id);
+                    addTestResult('ポモドーロ数を増加');
+
+                    await completeTask(testTask.id);
+                    addTestResult('テストタスクを完了');
+
+                    await updateDisplay();
+                } catch (error) {
+                    addTestResult(`タスク操作テストエラー: ${error.message}`, false);
+                }
+            });
+
+            document.getElementById('test-storage').addEventListener('click', async () => {
+                try {
+                    // ストレージテスト
+                    const testSettings = {
+                        autoStartNextTask: true,
+                        showTaskInPopup: false
+                    };
+
+                    await saveTaskSettings(testSettings);
+                    addTestResult('タスク設定を保存');
+
+                    const loadedSettings = await getTaskSettings();
+                    addTestResult(`タスク設定を読み込み: ${JSON.stringify(loadedSettings)}`);
+
+                    const stats = await getTaskStatistics();
+                    addTestResult(`統計情報: ${JSON.stringify(stats)}`);
+                } catch (error) {
+                    addTestResult(`ストレージテストエラー: ${error.message}`, false);
+                }
+            });
+
+            document.getElementById('clear-all-tasks').addEventListener('click', async () => {
+                if (confirm('すべてのタスクを削除しますか？この操作は元に戻せません。')) {
+                    try {
+                        const tasks = await getAllTasks();
+                        for (const task of tasks) {
+                            await deleteTask(task.id);
+                        }
+                        addTestResult('すべてのタスクを削除しました');
+                        await updateDisplay();
+                    } catch (error) {
+                        addTestResult(`全タスク削除エラー: ${error.message}`, false);
+                    }
+                }
+            });
+
+            // 初期表示
+            await updateDisplay();
+            addTestResult('タスク管理機能テストページを初期化しました');
+
+        }).catch(error => {
+            console.error('タスク管理モジュールの読み込みエラー:', error);
+            document.getElementById('test-output').innerHTML =
+                '<div class="p-2 rounded bg-red-100 text-red-800">タスク管理モジュールの読み込みに失敗しました</div>';
+        });
+    </script>
+</body>
+
+</html>

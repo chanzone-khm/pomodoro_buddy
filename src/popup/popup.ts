@@ -1,4 +1,4 @@
-import { MessageAction, SessionType, TimerSettings, TimerState } from '../types/index.js';
+import { MessageAction, SessionType, Task, TaskStatus, TimerSettings, TimerState } from '../types/index.js';
 import { playSessionCompleteSound } from '../utils/audio.js';
 import {
     calculateCycleState,
@@ -23,6 +23,20 @@ import {
     type ProgressBarState
 } from '../utils/progress.js';
 import {
+    completeTask,
+    createTask,
+    deleteTask,
+    getAllTasks,
+    getCurrentTask,
+    getTaskSettings,
+    getTaskStatistics,
+    saveTask,
+    saveTaskSettings,
+    setCurrentTask,
+    startTask,
+    updateTask
+} from '../utils/tasks.js';
+import {
     calculateTimeStats,
     DEBUG_TIME_OPTIONS,
     DEFAULT_TIME_SETTINGS,
@@ -43,12 +57,33 @@ const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
+// 現在のタスク表示関連のエレメント
+const currentTaskName = document.getElementById('current-task-name') as HTMLElement;
+const noTaskMessage = document.getElementById('no-task-message') as HTMLElement;
+
 // 設定関連のエレメント
 const settingsToggle = document.getElementById('settings-toggle') as HTMLButtonElement;
 const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
 const soundEnabledCheckbox = document.getElementById('sound-enabled') as HTMLInputElement;
 const testWorkSoundBtn = document.getElementById('test-work-sound') as HTMLButtonElement;
 const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLButtonElement;
+
+// タスク管理関連のエレメント
+const addTaskBtn = document.getElementById('add-task-btn') as HTMLButtonElement;
+const currentTaskSelect = document.getElementById('current-task-select') as HTMLSelectElement;
+const taskList = document.getElementById('task-list') as HTMLElement;
+const taskStats = document.getElementById('task-stats') as HTMLElement;
+const showTaskInPopupCheckbox = document.getElementById('show-task-in-popup') as HTMLInputElement;
+
+// タスクモーダル関連のエレメント
+const taskModal = document.getElementById('task-modal') as HTMLElement;
+const taskModalTitle = document.getElementById('task-modal-title') as HTMLElement;
+const closeTaskModalBtn = document.getElementById('close-task-modal') as HTMLButtonElement;
+const taskForm = document.getElementById('task-form') as HTMLFormElement;
+const taskNameInput = document.getElementById('task-name-input') as HTMLInputElement;
+const taskDescriptionInput = document.getElementById('task-description-input') as HTMLTextAreaElement;
+const estimatedPomodorosInput = document.getElementById('estimated-pomodoros-input') as HTMLSelectElement;
+const cancelTaskBtn = document.getElementById('cancel-task-btn') as HTMLButtonElement;
 
 // プログレスバー関連のエレメント
 const progressBarContainer = document.getElementById('progress-bar-container') as HTMLElement;
@@ -85,6 +120,11 @@ let currentCycleState: CycleState | null = null;
 // 時間設定の状態
 let timeSettings: TimeSettings = DEFAULT_TIME_SETTINGS;
 
+// タスク管理の状態
+let currentTask: Task | null = null;
+let allTasks: Task[] = [];
+let editingTaskId: string | null = null;
+
 /**
  * 初期化
  */
@@ -101,6 +141,9 @@ async function initialize() {
   // 時間設定を読み込み
   timeSettings = await loadTimeSettings();
 
+  // タスク管理の初期化
+  await initializeTasks();
+
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
   pauseBtn.addEventListener('click', handlePauseClick);
@@ -111,6 +154,19 @@ async function initialize() {
   soundEnabledCheckbox.addEventListener('change', handleSoundEnabledChange);
   testWorkSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Work));
   testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
+
+  // タスク管理関連のイベントリスナー
+  addTaskBtn.addEventListener('click', handleAddTaskClick);
+  currentTaskSelect.addEventListener('change', handleCurrentTaskChange);
+  showTaskInPopupCheckbox.addEventListener('change', handleShowTaskInPopupChange);
+
+  // タスクモーダル関連のイベントリスナー
+  closeTaskModalBtn.addEventListener('click', closeTaskModal);
+  cancelTaskBtn.addEventListener('click', closeTaskModal);
+  taskForm.addEventListener('submit', handleTaskFormSubmit);
+  taskModal.addEventListener('click', (e) => {
+    if (e.target === taskModal) closeTaskModal();
+  });
 
   // プログレスバー関連のイベントリスナー
   progressEnabledCheckbox.addEventListener('change', handleProgressEnabledChange);
@@ -628,5 +684,363 @@ async function handleLongBreakDurationChange() {
   chrome.runtime.sendMessage({ action: MessageAction.RESET });
 }
 
-// 初期化
-document.addEventListener('DOMContentLoaded', initialize);
+/**
+ * タスク管理の初期化
+ */
+async function initializeTasks() {
+  // 現在のタスクを取得
+  currentTask = await getCurrentTask();
+
+  // 全タスクを取得
+  allTasks = await getAllTasks();
+
+  // タスク設定を読み込み
+  const taskSettings = await getTaskSettings();
+  showTaskInPopupCheckbox.checked = taskSettings.showTaskInPopup;
+
+  // 表示を更新
+  await updateCurrentTaskDisplay();
+  updateTaskList();
+  updateTaskSelect();
+  updateTaskStats();
+}
+
+/**
+ * 現在のタスク表示を更新
+ */
+async function updateCurrentTaskDisplay() {
+  const taskSettings = await getTaskSettings();
+
+  if (currentTask && taskSettings.showTaskInPopup) {
+    currentTaskName.textContent = currentTask.name;
+    currentTaskName.classList.remove('hidden');
+    noTaskMessage.classList.add('hidden');
+  } else {
+    currentTaskName.classList.add('hidden');
+    noTaskMessage.classList.remove('hidden');
+  }
+}
+
+/**
+ * タスクリストを更新
+ */
+function updateTaskList() {
+  taskList.innerHTML = '';
+
+  // 進行中のタスクを最初に表示
+  const inProgressTasks = allTasks.filter(task => task.status === TaskStatus.InProgress);
+  const pendingTasks = allTasks.filter(task => task.status === TaskStatus.Pending);
+  const completedTasks = allTasks.filter(task => task.status === TaskStatus.Completed).slice(0, 3); // 最新3件のみ
+
+  const tasksToShow = [...inProgressTasks, ...pendingTasks, ...completedTasks];
+
+  if (tasksToShow.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'text-xs text-gray-400 text-center py-2';
+    emptyMessage.textContent = 'タスクがありません';
+    taskList.appendChild(emptyMessage);
+    return;
+  }
+
+  tasksToShow.forEach(task => {
+    const taskItem = createTaskItem(task);
+    taskList.appendChild(taskItem);
+  });
+}
+
+/**
+ * タスクアイテムのHTML要素を作成
+ */
+function createTaskItem(task: Task): HTMLElement {
+  const taskItem = document.createElement('div');
+  taskItem.className = `task-item task-${task.status}`;
+
+  const taskInfo = document.createElement('div');
+  taskInfo.className = 'flex-1 min-w-0';
+
+  const taskName = document.createElement('div');
+  taskName.className = 'task-name';
+  taskName.textContent = task.name;
+  taskName.title = task.description || task.name;
+
+  const taskMeta = document.createElement('div');
+  taskMeta.className = 'flex items-center gap-2 mt-1';
+
+  const statusBadge = document.createElement('span');
+  statusBadge.className = `task-status-badge task-status-${task.status}`;
+  statusBadge.textContent = getStatusText(task.status);
+
+  const pomodoroCount = document.createElement('span');
+  pomodoroCount.className = 'task-pomodoro-count';
+  pomodoroCount.textContent = `🍅 ${task.pomodoroCount}`;
+  if (task.estimatedPomodoros) {
+    pomodoroCount.textContent += `/${task.estimatedPomodoros}`;
+  }
+
+  taskMeta.appendChild(statusBadge);
+  taskMeta.appendChild(pomodoroCount);
+
+  taskInfo.appendChild(taskName);
+  taskInfo.appendChild(taskMeta);
+
+  const taskActions = document.createElement('div');
+  taskActions.className = 'task-actions';
+
+  // アクションボタンを作成
+  if (task.status === TaskStatus.Pending) {
+    const startBtn = createTaskActionButton('▶', 'start', () => handleTaskStart(task.id));
+    taskActions.appendChild(startBtn);
+  } else if (task.status === TaskStatus.InProgress) {
+    const completeBtn = createTaskActionButton('✓', 'complete', () => handleTaskComplete(task.id));
+    taskActions.appendChild(completeBtn);
+  }
+
+  const editBtn = createTaskActionButton('✏', 'edit', () => handleTaskEdit(task.id));
+  const deleteBtn = createTaskActionButton('🗑', 'delete', () => handleTaskDelete(task.id));
+
+  taskActions.appendChild(editBtn);
+  taskActions.appendChild(deleteBtn);
+
+  taskItem.appendChild(taskInfo);
+  taskItem.appendChild(taskActions);
+
+  return taskItem;
+}
+
+/**
+ * タスクアクションボタンを作成
+ */
+function createTaskActionButton(text: string, className: string, onClick: () => void): HTMLElement {
+  const button = document.createElement('button');
+  button.className = `task-action-btn ${className}`;
+  button.textContent = text;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+/**
+ * タスクステータスのテキストを取得
+ */
+function getStatusText(status: TaskStatus): string {
+  switch (status) {
+    case TaskStatus.Pending:
+      return '待機中';
+    case TaskStatus.InProgress:
+      return '進行中';
+    case TaskStatus.Completed:
+      return '完了';
+    default:
+      return '不明';
+  }
+}
+
+/**
+ * タスク選択セレクトボックスを更新
+ */
+function updateTaskSelect() {
+  currentTaskSelect.innerHTML = '<option value="">タスクを選択...</option>';
+
+  const availableTasks = allTasks.filter(task =>
+    task.status === TaskStatus.Pending || task.status === TaskStatus.InProgress
+  );
+
+  availableTasks.forEach(task => {
+    const option = document.createElement('option');
+    option.value = task.id;
+    option.textContent = task.name;
+    if (currentTask && currentTask.id === task.id) {
+      option.selected = true;
+    }
+    currentTaskSelect.appendChild(option);
+  });
+}
+
+/**
+ * タスク統計を更新
+ */
+async function updateTaskStats() {
+  const stats = await getTaskStatistics();
+
+  taskStats.innerHTML = `
+    <div class="flex justify-between text-xs">
+      <span>総タスク: ${stats.total}</span>
+      <span>完了: ${stats.completed}</span>
+      <span>🍅: ${stats.totalPomodoros}</span>
+    </div>
+  `;
+}
+
+/**
+ * タスク追加ボタンのクリックハンドラー
+ */
+function handleAddTaskClick() {
+  editingTaskId = null;
+  taskModalTitle.textContent = '新しいタスク';
+  taskNameInput.value = '';
+  taskDescriptionInput.value = '';
+  estimatedPomodorosInput.value = '';
+  openTaskModal();
+}
+
+/**
+ * 現在のタスク選択の変更ハンドラー
+ */
+async function handleCurrentTaskChange() {
+  const selectedTaskId = currentTaskSelect.value;
+
+  if (selectedTaskId) {
+    await setCurrentTask(selectedTaskId);
+    currentTask = await getCurrentTask();
+
+    // 選択したタスクを進行中にする
+    if (currentTask && currentTask.status === TaskStatus.Pending) {
+      await startTask(selectedTaskId);
+      allTasks = await getAllTasks();
+      updateTaskList();
+    }
+  } else {
+    await setCurrentTask(undefined);
+    currentTask = null;
+  }
+
+  await updateCurrentTaskDisplay();
+}
+
+/**
+ * ポップアップにタスク名表示設定の変更ハンドラー
+ */
+async function handleShowTaskInPopupChange() {
+  await saveTaskSettings({
+    showTaskInPopup: showTaskInPopupCheckbox.checked
+  });
+
+  await updateCurrentTaskDisplay();
+}
+
+/**
+ * タスクモーダルを開く
+ */
+function openTaskModal() {
+  taskModal.classList.remove('hidden');
+  taskNameInput.focus();
+}
+
+/**
+ * タスクモーダルを閉じる
+ */
+function closeTaskModal() {
+  taskModal.classList.add('hidden');
+  editingTaskId = null;
+}
+
+/**
+ * タスクフォームの送信ハンドラー
+ */
+async function handleTaskFormSubmit(e: Event) {
+  e.preventDefault();
+
+  const name = taskNameInput.value.trim();
+  if (!name) return;
+
+  const description = taskDescriptionInput.value.trim() || undefined;
+  const estimatedPomodoros = estimatedPomodorosInput.value ?
+    parseInt(estimatedPomodorosInput.value) : undefined;
+
+  if (editingTaskId) {
+    // 既存タスクの編集
+    await updateTask(editingTaskId, {
+      name,
+      description,
+      estimatedPomodoros
+    });
+  } else {
+    // 新しいタスクの作成
+    const newTask = createTask(name, description, estimatedPomodoros);
+    await saveTask(newTask);
+  }
+
+  // データを再読み込みして表示を更新
+  allTasks = await getAllTasks();
+  updateTaskList();
+  updateTaskSelect();
+  updateTaskStats();
+
+  closeTaskModal();
+}
+
+/**
+ * タスク開始ハンドラー
+ */
+async function handleTaskStart(taskId: string) {
+  await startTask(taskId);
+  await setCurrentTask(taskId);
+
+  currentTask = await getCurrentTask();
+  allTasks = await getAllTasks();
+
+  await updateCurrentTaskDisplay();
+  updateTaskList();
+  updateTaskSelect();
+}
+
+/**
+ * タスク完了ハンドラー
+ */
+async function handleTaskComplete(taskId: string) {
+  await completeTask(taskId);
+
+  // 現在のタスクが完了した場合はクリア
+  if (currentTask && currentTask.id === taskId) {
+    currentTask = null;
+  }
+
+  allTasks = await getAllTasks();
+
+  await updateCurrentTaskDisplay();
+  updateTaskList();
+  updateTaskSelect();
+  updateTaskStats();
+}
+
+/**
+ * タスク編集ハンドラー
+ */
+async function handleTaskEdit(taskId: string) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  editingTaskId = taskId;
+  taskModalTitle.textContent = 'タスクを編集';
+  taskNameInput.value = task.name;
+  taskDescriptionInput.value = task.description || '';
+  estimatedPomodorosInput.value = task.estimatedPomodoros?.toString() || '';
+
+  openTaskModal();
+}
+
+/**
+ * タスク削除ハンドラー
+ */
+async function handleTaskDelete(taskId: string) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  if (confirm(`タスク「${task.name}」を削除しますか？`)) {
+    await deleteTask(taskId);
+
+    // 現在のタスクが削除された場合はクリア
+    if (currentTask && currentTask.id === taskId) {
+      currentTask = null;
+    }
+
+    allTasks = await getAllTasks();
+
+    await updateCurrentTaskDisplay();
+    updateTaskList();
+    updateTaskSelect();
+    updateTaskStats();
+  }
+}
+
+// 初期化時に実行
+initialize();

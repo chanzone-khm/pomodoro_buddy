@@ -60,9 +60,44 @@ export interface Message {
 }
 
 /**
+ * タスクの状態を表す列挙型
+ */
+export enum TaskStatus {
+  Pending = 'pending',
+  InProgress = 'in-progress',
+  Completed = 'completed'
+}
+
+/**
+ * タスクを表すインターフェース
+ */
+export interface Task {
+  id: string; // タスクの一意識別子
+  name: string; // タスク名
+  description?: string; // タスクの説明（オプション）
+  status: TaskStatus; // タスクの状態
+  createdAt: number; // 作成日時（エポックミリ秒）
+  startedAt?: number; // 開始日時（エポックミリ秒）
+  completedAt?: number; // 完了日時（エポックミリ秒）
+  pomodoroCount: number; // このタスクで完了したポモドーロ数
+  estimatedPomodoros?: number; // 予想ポモドーロ数（オプション）
+}
+
+/**
+ * タスクリストの設定を表すインターフェース
+ */
+export interface TaskSettings {
+  currentTaskId?: string; // 現在実行中のタスクID
+  autoStartNextTask: boolean; // 次のタスクを自動開始するか
+  showTaskInPopup: boolean; // ポップアップにタスク名を表示するか
+}
+
+/**
  * ストレージのキー
  */
 export enum StorageKey {
   TIMER_STATE = 'timerState',
-  TIMER_SETTINGS = 'timerSettings'
-} 
+  TIMER_SETTINGS = 'timerSettings',
+  TASKS = 'tasks',
+  TASK_SETTINGS = 'taskSettings'
+}
