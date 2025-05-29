@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Buddy - タスク管理</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body class="min-w-[600px] max-w-[900px] bg-gray-100 p-4">
+    <div class="bg-white rounded-lg shadow-md p-4">
+        <!-- ヘッダー -->
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+                <h1 class="text-lg font-semibold text-gray-800">🍅 タスク管理</h1>
+                <div id="day-summary" class="text-sm text-gray-600">
+                    <!-- 今日のサマリーがここに表示 -->
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button id="back-to-timer" class="btn-small btn-secondary">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    タイマーに戻る
+                </button>
+                <button id="settings-btn" class="btn-small btn-secondary">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    設定
+                </button>
+            </div>
+        </div>
+
+        <!-- タスクマネージャーコンテナ -->
+        <div id="task-manager-container">
+            <!-- TaskManagerコンポーネントがここに描画されます -->
+        </div>
+
+        <!-- 設定パネル（最初は非表示） -->
+        <div id="settings-panel" class="hidden mt-6 pt-4 border-t border-gray-200">
+            <h3 class="text-md font-medium text-gray-700 mb-4">設定</h3>
+
+            <div class="space-y-4">
+                <!-- スロット数設定 -->
+                <div class="flex items-center justify-between">
+                    <label for="daily-slots" class="text-sm text-gray-700">
+                        1日のポモドーロスロット数
+                    </label>
+                    <select id="daily-slots" class="text-sm border border-gray-300 rounded px-2 py-1">
+                        <option value="4">4スロット</option>
+                        <option value="6" selected>6スロット</option>
+                        <option value="8">8スロット</option>
+                        <option value="10">10スロット</option>
+                        <option value="12">12スロット</option>
+                    </select>
+                </div>
+
+                <!-- 自動タスク開始 -->
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-gray-700">
+                        次のタスクを自動開始
+                    </label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="auto-start-next-task" class="sr-only peer">
+                        <div
+                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                        </div>
+                    </label>
+                </div>
+
+                <!-- カンバンビュー有効/無効 -->
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-gray-700">
+                        カンバンビューを有効
+                    </label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="kanban-view-enabled" class="sr-only peer" checked>
+                        <div
+                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                        </div>
+                    </label>
+                </div>
+
+                <!-- データリセット -->
+                <div class="pt-4 border-t border-gray-200">
+                    <div class="flex gap-2">
+                        <button id="clear-today-plan" class="btn-small btn-secondary flex-1">
+                            今日のプランをクリア
+                        </button>
+                        <button id="clear-all-tasks" class="btn-small btn-danger flex-1">
+                            全タスクを削除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計情報（展開可能） -->
+        <div id="statistics-section" class="mt-6 pt-4 border-t border-gray-200">
+            <button id="statistics-toggle"
+                class="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-800">
+                <span class="flex items-center gap-2">
+                    📊 統計情報
+                </span>
+                <svg id="statistics-arrow" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    class="transform transition-transform">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            <div id="statistics-content" class="hidden mt-3 space-y-3">
+                <div id="daily-statistics" class="grid grid-cols-2 gap-4 text-sm">
+                    <!-- 統計データがここに表示 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div id="confirmation-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-80 max-w-full mx-4">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2" id="confirmation-title">
+                    確認
+                </h3>
+                <p class="text-sm text-gray-600 mb-6" id="confirmation-message">
+                    この操作は取り消せません。続行しますか？
+                </p>
+                <div class="flex gap-3">
+                    <button id="confirmation-cancel"
+                        class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
+                        キャンセル
+                    </button>
+                    <button id="confirmation-confirm"
+                        class="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700">
+                        削除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="task-manager.ts"></script>
+</body>
+
+</html>

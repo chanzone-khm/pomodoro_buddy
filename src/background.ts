@@ -1,38 +1,38 @@
 import {
-  Message,
-  MessageAction,
-  SessionType,
-  StorageKey,
-  TimerSettings,
-  TimerState
+    Message,
+    MessageAction,
+    SessionType,
+    StorageKey,
+    TimerSettings,
+    TimerState
 } from './types/index.js';
 import { playSessionCompleteSound } from './utils/audio.js';
 import {
-  advanceCycle,
-  DEFAULT_CYCLE_SETTINGS,
-  loadCycleSettings,
-  shouldTakeLongBreak,
-  type CycleSettings
+    advanceCycle,
+    DEFAULT_CYCLE_SETTINGS,
+    loadCycleSettings,
+    shouldTakeLongBreak,
+    type CycleSettings
 } from './utils/cycle.js';
 import {
-  getCurrentTask,
-  incrementTaskPomodoro
+    getCurrentTask,
+    incrementTaskPomodoro
 } from './utils/tasks.js';
 import {
-  convertToSeconds,
-  DEFAULT_TIME_SETTINGS,
-  loadTimeSettings,
-  type TimeSettings
+    convertToSeconds,
+    DEFAULT_TIME_SETTINGS,
+    loadTimeSettings,
+    type TimeSettings
 } from './utils/time-settings.js';
 import {
-  calculateBadgeText,
-  calculateRemainingTime,
-  createTimerState,
-  DEFAULT_TIMER_SETTINGS,
-  isTimerCompleted,
-  pauseTimer,
-  resetTimer,
-  startTimer
+    calculateBadgeText,
+    calculateRemainingTime,
+    createTimerState,
+    DEFAULT_TIMER_SETTINGS,
+    isTimerCompleted,
+    pauseTimer,
+    resetTimer,
+    startTimer
 } from './utils/timer.js';
 
 // 初期状態
@@ -358,13 +358,45 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
         });
       }
       break;
+
+    case MessageAction.COMPLETE_CURRENT_SLOT:
+      try {
+        // 現在のタスクがある場合、ポモドーロカウントを増加
+        const currentTask = await getCurrentTask();
+        if (currentTask) {
+          await incrementTaskPomodoro(currentTask.id);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: '現在のタスクが設定されていません' });
+        }
+      } catch (error) {
+        console.error('ポモドーロ完了エラー:', error);
+        sendResponse({ success: false, error: 'ポモドーロ完了に失敗しました' });
+      }
+      break;
+
+    case MessageAction.GET_CURRENT_TASK_INFO:
+      try {
+        const currentTask = await getCurrentTask();
+        sendResponse({
+          currentTask: currentTask,
+          timerState: currentState,
+          cycleState: cycleSettings
+        });
+      } catch (error) {
+        console.error('現在のタスク情報取得エラー:', error);
+        sendResponse({ currentTask: null, timerState: currentState, cycleState: cycleSettings });
+      }
+      break;
   }
 
   saveState();
   updateBadge();
 
   // 非同期にレスポンスを返す場合はtrue
-  return action === MessageAction.GET_STATE;
+  return action === MessageAction.GET_STATE ||
+         action === MessageAction.COMPLETE_CURRENT_SLOT ||
+         action === MessageAction.GET_CURRENT_TASK_INFO;
 });
 
 // 初期化

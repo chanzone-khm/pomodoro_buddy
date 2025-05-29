@@ -1,0 +1,369 @@
+/* カンバンボード全体 */
+.kanban-board {
+	width: 100%;
+	max-width: 800px;
+	margin: 0 auto;
+}
+
+.kanban-columns {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 16px;
+	min-height: 400px;
+}
+
+/* カンバン列 */
+.kanban-column {
+	background: #f8fafc;
+	border-radius: 8px;
+	padding: 12px;
+	border: 1px solid #e2e8f0;
+}
+
+.kanban-column-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+.kanban-column-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: #374151;
+	margin: 0;
+}
+
+.kanban-column-count {
+	background: #6366f1;
+	color: white;
+	font-size: 12px;
+	padding: 2px 8px;
+	border-radius: 12px;
+	font-weight: 500;
+}
+
+.kanban-column-content {
+	min-height: 300px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* タスクカード */
+.task-card {
+	background: white;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	padding: 12px;
+	cursor: move;
+	transition: all 0.2s ease;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.task-card:hover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	transform: translateY(-1px);
+}
+
+.task-card[draggable="true"]:active {
+	transform: rotate(3deg);
+	opacity: 0.8;
+}
+
+.task-card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 8px;
+}
+
+.task-card-title {
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+	line-height: 1.4;
+	flex: 1;
+}
+
+.task-card-delete {
+	background: none;
+	border: none;
+	color: #94a3b8;
+	cursor: pointer;
+	padding: 4px;
+	border-radius: 4px;
+	transition: all 0.2s ease;
+	margin-left: 8px;
+}
+
+.task-card-delete:hover {
+	color: #ef4444;
+	background: #fef2f2;
+}
+
+.task-card-description {
+	font-size: 12px;
+	color: #6b7280;
+	margin-bottom: 8px;
+	line-height: 1.4;
+}
+
+.task-card-progress {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 12px;
+}
+
+.progress-text {
+	color: #374151;
+	font-weight: 500;
+}
+
+.progress-slots {
+	color: #6b7280;
+}
+
+.task-card-completed {
+	font-size: 11px;
+	color: #059669;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid #e2e8f0;
+}
+
+/* 新しいタスク追加ボタン */
+.add-task-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	padding: 12px;
+	background: #f1f5f9;
+	border: 2px dashed #cbd5e1;
+	border-radius: 6px;
+	color: #64748b;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.add-task-button:hover {
+	background: #e2e8f0;
+	border-color: #94a3b8;
+	color: #475569;
+}
+
+/* ポモドーロスロット */
+.pomodoro-slots {
+	margin-bottom: 20px;
+}
+
+.slots-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.slots-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: #374151;
+	margin: 0;
+}
+
+.slots-counter {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+.used-count {
+	color: #059669;
+}
+
+.separator {
+	color: #6b7280;
+}
+
+.total-count {
+	color: #374151;
+}
+
+.slots-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+	gap: 8px;
+	max-width: 600px;
+}
+
+/* スロット */
+.slot {
+	aspect-ratio: 1;
+	border: 2px solid #e2e8f0;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	cursor: pointer;
+	min-height: 80px;
+}
+
+.slot-empty {
+	background: #f8fafc;
+	border-style: dashed;
+}
+
+.slot-empty:hover {
+	background: #e2e8f0;
+	border-color: #94a3b8;
+}
+
+.slot-assigned {
+	background: #fef3c7;
+	border-color: #f59e0b;
+}
+
+.slot-completed {
+	background: #d1fae5;
+	border-color: #059669;
+}
+
+.slot-dragover {
+	background: #dbeafe !important;
+	border-color: #3b82f6 !important;
+	transform: scale(1.05);
+}
+
+.slot-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	position: relative;
+	padding: 8px;
+}
+
+.slot-empty-content {
+	color: #94a3b8;
+}
+
+.empty-icon {
+	opacity: 0.6;
+}
+
+.slot-assigned-content {
+	gap: 4px;
+}
+
+.completion-icon {
+	font-size: 18px;
+	color: #059669;
+	font-weight: bold;
+}
+
+.progress-icon {
+	font-size: 16px;
+}
+
+.task-info {
+	text-align: center;
+	flex: 1;
+}
+
+.task-name {
+	font-size: 11px;
+	font-weight: 500;
+	color: #374151;
+	line-height: 1.2;
+	margin-bottom: 2px;
+}
+
+.task-progress {
+	font-size: 10px;
+	color: #6b7280;
+}
+
+.slot-remove-btn {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	background: rgba(255, 255, 255, 0.9);
+	border: none;
+	border-radius: 50%;
+	width: 20px;
+	height: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #6b7280;
+	transition: all 0.2s ease;
+	opacity: 0;
+}
+
+.slot:hover .slot-remove-btn {
+	opacity: 1;
+}
+
+.slot-remove-btn:hover {
+	background: #fef2f2;
+	color: #ef4444;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+	.kanban-columns {
+		grid-template-columns: 1fr;
+		gap: 12px;
+	}
+
+	.slots-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	.slot {
+		min-height: 60px;
+	}
+}
+
+/* ドラッグ&ドロップ時のスタイル */
+.task-card.dragging {
+	opacity: 0.5;
+	transform: rotate(3deg);
+}
+
+.kanban-column-content[data-droppable]:hover {
+	background: rgba(99, 102, 241, 0.05);
+	border-radius: 6px;
+}
+
+/* アニメーション */
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.task-card {
+	animation: slideIn 0.3s ease-out;
+}
+
+.slot {
+	animation: slideIn 0.2s ease-out;
+}

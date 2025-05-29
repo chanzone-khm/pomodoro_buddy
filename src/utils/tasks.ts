@@ -1,25 +1,28 @@
-import { StorageKey, Task, TaskSettings, TaskStatus } from '../types/index.js';
+import { RepeatType, StorageKey, Task, TaskSettings, TaskStatus } from '../types/index.js';
 
 /**
  * タスクのデフォルト設定
  */
 const DEFAULT_TASK_SETTINGS: TaskSettings = {
   autoStartNextTask: false,
-  showTaskInPopup: true
+  showTaskInPopup: true,
+  kanbanView: true
 };
 
 /**
  * 新しいタスクを作成する
  */
-export function createTask(name: string, description?: string, estimatedPomodoros?: number): Task {
+export function createTask(name: string, description?: string, estimatePomodoros: number = 1): Task {
   return {
     id: generateTaskId(),
     name: name.trim(),
     description: description?.trim(),
-    status: TaskStatus.Pending,
+    status: TaskStatus.Backlog,
     createdAt: Date.now(),
-    pomodoroCount: 0,
-    estimatedPomodoros
+    actualPomodoros: 0,
+    estimatePomodoros,
+    repeatType: RepeatType.None,
+    tags: []
   };
 }
 
@@ -117,7 +120,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
 export async function startTask(taskId: string): Promise<void> {
   try {
     await updateTask(taskId, {
-      status: TaskStatus.InProgress,
+      status: TaskStatus.Doing,
       startedAt: Date.now()
     });
   } catch (error) {
@@ -132,7 +135,7 @@ export async function startTask(taskId: string): Promise<void> {
 export async function completeTask(taskId: string): Promise<void> {
   try {
     await updateTask(taskId, {
-      status: TaskStatus.Completed,
+      status: TaskStatus.Done,
       completedAt: Date.now()
     });
 
@@ -157,7 +160,7 @@ export async function incrementTaskPomodoro(taskId: string): Promise<void> {
 
     if (task) {
       await updateTask(taskId, {
-        pomodoroCount: task.pomodoroCount + 1
+        actualPomodoros: task.actualPomodoros + 1
       });
     }
   } catch (error) {
@@ -245,10 +248,10 @@ export async function getTaskStatistics(): Promise<{
 
     const stats = {
       total: tasks.length,
-      pending: tasks.filter(task => task.status === TaskStatus.Pending).length,
-      inProgress: tasks.filter(task => task.status === TaskStatus.InProgress).length,
-      completed: tasks.filter(task => task.status === TaskStatus.Completed).length,
-      totalPomodoros: tasks.reduce((sum, task) => sum + task.pomodoroCount, 0)
+      pending: tasks.filter(task => task.status === TaskStatus.Backlog).length,
+      inProgress: tasks.filter(task => task.status === TaskStatus.Doing).length,
+      completed: tasks.filter(task => task.status === TaskStatus.Done).length,
+      totalPomodoros: tasks.reduce((sum, task) => sum + task.actualPomodoros, 0)
     };
 
     return stats;
@@ -270,7 +273,7 @@ export async function getTaskStatistics(): Promise<{
 export async function getPendingTasks(): Promise<Task[]> {
   try {
     const tasks = await getAllTasks();
-    return tasks.filter(task => task.status === TaskStatus.Pending);
+    return tasks.filter(task => task.status === TaskStatus.Backlog);
   } catch (error) {
     console.error('待機中タスク取得エラー:', error);
     return [];
@@ -283,7 +286,7 @@ export async function getPendingTasks(): Promise<Task[]> {
 export async function getInProgressTasks(): Promise<Task[]> {
   try {
     const tasks = await getAllTasks();
-    return tasks.filter(task => task.status === TaskStatus.InProgress);
+    return tasks.filter(task => task.status === TaskStatus.Doing);
   } catch (error) {
     console.error('進行中タスク取得エラー:', error);
     return [];
@@ -296,7 +299,7 @@ export async function getInProgressTasks(): Promise<Task[]> {
 export async function getCompletedTasks(): Promise<Task[]> {
   try {
     const tasks = await getAllTasks();
-    return tasks.filter(task => task.status === TaskStatus.Completed);
+    return tasks.filter(task => task.status === TaskStatus.Done);
   } catch (error) {
     console.error('完了済みタスク取得エラー:', error);
     return [];

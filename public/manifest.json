@@ -32,7 +32,8 @@
     {
       "resources": [
         "sounds/*.wav",
-        "offscreen.js"
+        "offscreen.js",
+        "src/components/*.css"
       ],
       "matches": [
         "<all_urls>"

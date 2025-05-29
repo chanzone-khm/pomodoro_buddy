@@ -70,6 +70,7 @@ const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLBut
 
 // タスク管理関連のエレメント
 const addTaskBtn = document.getElementById('add-task-btn') as HTMLButtonElement;
+const openTaskManagerBtn = document.getElementById('open-task-manager-btn') as HTMLButtonElement;
 const currentTaskSelect = document.getElementById('current-task-select') as HTMLSelectElement;
 const taskList = document.getElementById('task-list') as HTMLElement;
 const taskStats = document.getElementById('task-stats') as HTMLElement;
@@ -157,6 +158,7 @@ async function initialize() {
 
   // タスク管理関連のイベントリスナー
   addTaskBtn.addEventListener('click', handleAddTaskClick);
+  openTaskManagerBtn.addEventListener('click', handleOpenTaskManagerClick);
   currentTaskSelect.addEventListener('change', handleCurrentTaskChange);
   showTaskInPopupCheckbox.addEventListener('change', handleShowTaskInPopupChange);
 
@@ -728,9 +730,9 @@ function updateTaskList() {
   taskList.innerHTML = '';
 
   // 進行中のタスクを最初に表示
-  const inProgressTasks = allTasks.filter(task => task.status === TaskStatus.InProgress);
-  const pendingTasks = allTasks.filter(task => task.status === TaskStatus.Pending);
-  const completedTasks = allTasks.filter(task => task.status === TaskStatus.Completed).slice(0, 3); // 最新3件のみ
+  const inProgressTasks = allTasks.filter(task => task.status === TaskStatus.Doing);
+  const pendingTasks = allTasks.filter(task => task.status === TaskStatus.Backlog);
+  const completedTasks = allTasks.filter(task => task.status === TaskStatus.Done).slice(0, 3); // 最新3件のみ
 
   const tasksToShow = [...inProgressTasks, ...pendingTasks, ...completedTasks];
 
@@ -772,9 +774,9 @@ function createTaskItem(task: Task): HTMLElement {
 
   const pomodoroCount = document.createElement('span');
   pomodoroCount.className = 'task-pomodoro-count';
-  pomodoroCount.textContent = `🍅 ${task.pomodoroCount}`;
-  if (task.estimatedPomodoros) {
-    pomodoroCount.textContent += `/${task.estimatedPomodoros}`;
+  pomodoroCount.textContent = `🍅 ${task.actualPomodoros}`;
+  if (task.estimatePomodoros) {
+    pomodoroCount.textContent += `/${task.estimatePomodoros}`;
   }
 
   taskMeta.appendChild(statusBadge);
@@ -787,10 +789,10 @@ function createTaskItem(task: Task): HTMLElement {
   taskActions.className = 'task-actions';
 
   // アクションボタンを作成
-  if (task.status === TaskStatus.Pending) {
+  if (task.status === TaskStatus.Backlog) {
     const startBtn = createTaskActionButton('▶', 'start', () => handleTaskStart(task.id));
     taskActions.appendChild(startBtn);
-  } else if (task.status === TaskStatus.InProgress) {
+  } else if (task.status === TaskStatus.Doing) {
     const completeBtn = createTaskActionButton('✓', 'complete', () => handleTaskComplete(task.id));
     taskActions.appendChild(completeBtn);
   }
@@ -823,11 +825,11 @@ function createTaskActionButton(text: string, className: string, onClick: () => 
  */
 function getStatusText(status: TaskStatus): string {
   switch (status) {
-    case TaskStatus.Pending:
+    case TaskStatus.Backlog:
       return '待機中';
-    case TaskStatus.InProgress:
+    case TaskStatus.Doing:
       return '進行中';
-    case TaskStatus.Completed:
+    case TaskStatus.Done:
       return '完了';
     default:
       return '不明';
@@ -841,7 +843,7 @@ function updateTaskSelect() {
   currentTaskSelect.innerHTML = '<option value="">タスクを選択...</option>';
 
   const availableTasks = allTasks.filter(task =>
-    task.status === TaskStatus.Pending || task.status === TaskStatus.InProgress
+    task.status === TaskStatus.Backlog || task.status === TaskStatus.Doing
   );
 
   availableTasks.forEach(task => {
@@ -893,7 +895,7 @@ async function handleCurrentTaskChange() {
     currentTask = await getCurrentTask();
 
     // 選択したタスクを進行中にする
-    if (currentTask && currentTask.status === TaskStatus.Pending) {
+    if (currentTask && currentTask.status === TaskStatus.Backlog) {
       await startTask(selectedTaskId);
       allTasks = await getAllTasks();
       updateTaskList();
@@ -943,7 +945,7 @@ async function handleTaskFormSubmit(e: Event) {
   if (!name) return;
 
   const description = taskDescriptionInput.value.trim() || undefined;
-  const estimatedPomodoros = estimatedPomodorosInput.value ?
+  const estimatePomodoros = estimatedPomodorosInput.value ?
     parseInt(estimatedPomodorosInput.value) : undefined;
 
   if (editingTaskId) {
@@ -951,11 +953,11 @@ async function handleTaskFormSubmit(e: Event) {
     await updateTask(editingTaskId, {
       name,
       description,
-      estimatedPomodoros
+      estimatePomodoros
     });
   } else {
     // 新しいタスクの作成
-    const newTask = createTask(name, description, estimatedPomodoros);
+    const newTask = createTask(name, description, estimatePomodoros);
     await saveTask(newTask);
   }
 
@@ -1013,7 +1015,7 @@ async function handleTaskEdit(taskId: string) {
   taskModalTitle.textContent = 'タスクを編集';
   taskNameInput.value = task.name;
   taskDescriptionInput.value = task.description || '';
-  estimatedPomodorosInput.value = task.estimatedPomodoros?.toString() || '';
+  estimatedPomodorosInput.value = task.estimatePomodoros?.toString() || '';
 
   openTaskModal();
 }
@@ -1040,6 +1042,13 @@ async function handleTaskDelete(taskId: string) {
     updateTaskSelect();
     updateTaskStats();
   }
+}
+
+/**
+ * タスクマネージャーを開くハンドラー
+ */
+function handleOpenTaskManagerClick() {
+  window.open(chrome.runtime.getURL('src/popup/task-manager.html'), '_blank', 'width=900,height=700');
 }
 
 // 初期化時に実行

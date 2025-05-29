@@ -1,4 +1,4 @@
-import { SessionType, TimerState, TimerSettings } from '../types/index.js';
+import { SessionType, TimerSettings, TimerState } from '../types/index.js';
 
 /**
  * デフォルトのタイマー設定
@@ -8,7 +8,8 @@ export const DEFAULT_TIMER_SETTINGS: TimerSettings = {
   breakDurationSec: 5 * 60, // 5分
   soundEnabled: false, // デフォルトでは音を鳴らさない
   workCompleteSound: 'sounds/work-complete.wav',
-  breakCompleteSound: 'sounds/break-complete.wav'
+  breakCompleteSound: 'sounds/break-complete.wav',
+  dailySlots: 6 // 1日のポモドーロスロット数（デフォルト6）
 };
 
 /**
@@ -35,7 +36,7 @@ export function startTimer(state: TimerState): TimerState {
   if (state.isRunning) return state;
 
   const now = Date.now();
-  
+
   // 一時停止からの再開の場合
   if (state.pausedAt && state.pausedElapsed) {
     return {
@@ -46,7 +47,7 @@ export function startTimer(state: TimerState): TimerState {
       pausedElapsed: undefined
     };
   }
-  
+
   // 新規開始の場合
   return {
     ...state,
@@ -62,10 +63,10 @@ export function startTimer(state: TimerState): TimerState {
  */
 export function pauseTimer(state: TimerState): TimerState {
   if (!state.isRunning) return state;
-  
+
   const now = Date.now();
   const elapsed = now - state.startEpoch;
-  
+
   return {
     ...state,
     isRunning: false,
@@ -93,7 +94,7 @@ export function resetTimer(state: TimerState, settings: TimerSettings = DEFAULT_
 export function switchSession(state: TimerState, settings: TimerSettings = DEFAULT_TIMER_SETTINGS): TimerState {
   const nextType = state.type === SessionType.Work ? SessionType.Break : SessionType.Work;
   const nextState = createTimerState(nextType, settings);
-  
+
   // 自動的に開始する場合は以下のようにする
   return startTimer(nextState);
 }
@@ -113,7 +114,7 @@ export function calculateRemainingTime(state: TimerState): number {
     // まだ開始していない場合
     return state.durationSec;
   }
-  
+
   // 実行中の場合
   const now = Date.now();
   const elapsedSec = Math.floor((now - state.startEpoch) / 1000);
@@ -147,8 +148,8 @@ export function formatTime(seconds: number): string {
  */
 export function calculateBadgeText(state: TimerState): string {
   if (!state.isRunning) return '';
-  
+
   const remainingSec = calculateRemainingTime(state);
   const remainingMin = Math.ceil(remainingSec / 60);
   return remainingMin.toString();
-} 
+}
