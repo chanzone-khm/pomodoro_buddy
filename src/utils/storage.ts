@@ -273,3 +273,29 @@ export async function updateTodayStatistics(): Promise<void> {
   allStatistics[today] = statistics;
   await setStorageData(StorageKey.STATISTICS, allStatistics);
 }
+
+/**
+ * スロット間でタスク割り当てを交換
+ */
+export async function swapSlotAssignments(sourceSlotId: string, targetSlotId: string): Promise<void> {
+  const dayPlan = await getTodayDayPlan();
+  const sourceSlot = dayPlan.slots.find(s => s.id === sourceSlotId);
+  const targetSlot = dayPlan.slots.find(s => s.id === targetSlotId);
+
+  if (sourceSlot && targetSlot) {
+    // スロットの内容を交換
+    const tempTaskId = sourceSlot.taskId;
+    const tempCompleted = sourceSlot.completed;
+    const tempCompletedAt = sourceSlot.completedAt;
+
+    sourceSlot.taskId = targetSlot.taskId;
+    sourceSlot.completed = targetSlot.completed;
+    sourceSlot.completedAt = targetSlot.completedAt;
+
+    targetSlot.taskId = tempTaskId;
+    targetSlot.completed = tempCompleted;
+    targetSlot.completedAt = tempCompletedAt;
+
+    await updateDayPlan(dayPlan);
+  }
+}

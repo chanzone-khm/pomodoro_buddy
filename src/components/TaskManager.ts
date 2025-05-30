@@ -7,6 +7,7 @@ export class TaskManager {
   private kanbanBoard: KanbanBoard | null = null;
   private pomodoroSlots: PomodoroSlots | null = null;
   private viewMode: 'kanban' | 'list' = 'kanban';
+  private isUpdating: boolean = false;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -141,15 +142,27 @@ export class TaskManager {
   }
 
   private async handleComponentUpdate() {
-    // 統計を更新
-    await updateTodayStatistics();
-
-    // 他のコンポーネントも更新
-    if (this.pomodoroSlots) {
-      await this.pomodoroSlots.refresh();
+    // 更新中の場合は処理をスキップ
+    if (this.isUpdating) {
+      return;
     }
-    if (this.kanbanBoard) {
-      await this.kanbanBoard.refresh();
+
+    this.isUpdating = true;
+
+    try {
+      // 統計を更新
+      await updateTodayStatistics();
+
+      // 他のコンポーネントもサイレント更新
+      if (this.pomodoroSlots) {
+        await this.pomodoroSlots.refreshSilent();
+      }
+      // カンバンボードもサイレント更新
+      if (this.kanbanBoard) {
+        await this.kanbanBoard.refreshSilent();
+      }
+    } finally {
+      this.isUpdating = false;
     }
   }
 

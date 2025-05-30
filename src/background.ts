@@ -43,6 +43,10 @@ let cycleSettings: CycleSettings = DEFAULT_CYCLE_SETTINGS;
 let checkInterval: ReturnType<typeof setInterval> | null = null;
 let badgeUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
+// ストレージ書き込み制御用
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let needsSave = false;
+
 // アラーム名の定数
 const TIMER_ALARM = 'pomodoro-timer-check';
 
@@ -50,11 +54,26 @@ const TIMER_ALARM = 'pomodoro-timer-check';
  * 初期化処理
  */
 async function initialize() {
-  // ストレージから状態を復元
-  const data = await chrome.storage.sync.get([
-    StorageKey.TIMER_STATE,
-    StorageKey.TIMER_SETTINGS
-  ]);
+  // ストレージから状態を復元（syncを優先、失敗時はlocalから）
+  let data;
+  try {
+    data = await chrome.storage.sync.get([
+      StorageKey.TIMER_STATE,
+      StorageKey.TIMER_SETTINGS
+    ]);
+  } catch (error) {
+    console.error('sync ストレージ読み込みエラー:', error);
+    try {
+      data = await chrome.storage.local.get([
+        StorageKey.TIMER_STATE,
+        StorageKey.TIMER_SETTINGS
+      ]);
+      console.log('localストレージから復元しました');
+    } catch (localError) {
+      console.error('local ストレージ読み込みエラー:', localError);
+      data = {};
+    }
+  }
 
   if (data[StorageKey.TIMER_SETTINGS]) {
     settings = data[StorageKey.TIMER_SETTINGS] as TimerSettings;
@@ -83,6 +102,9 @@ async function initialize() {
 
   // バッジを初期化
   updateBadge();
+
+  // 初期状態を保存（即座に）
+  await saveState(true);
 
   // アラームのリスナーを設定
   chrome.alarms.onAlarm.addListener(handleAlarm);
@@ -149,8 +171,8 @@ async function handleTimerComplete() {
   // 次のセッションに切り替え（長い休憩の判定を含む）
   currentState = switchToNextSession(currentState, settings);
 
-  // 状態を保存
-  saveState();
+  // 状態を保存（即座に）
+  await saveState(true);
 
   // バッジを更新
   updateBadge();
@@ -273,13 +295,56 @@ function switchToNextSession(state: TimerState, timerSettings: TimerSettings): T
 }
 
 /**
- * 状態をストレージに保存する
+ * 状態をストレージに保存する（デバウンス付き）
  */
-async function saveState() {
-  await chrome.storage.sync.set({
+async function saveState(immediate = false) {
+  if (immediate) {
+    // 即座に保存
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    await doSaveState();
+    needsSave = false;
+  } else {
+    // デバウンス処理（1秒後に保存）
+    needsSave = true;
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+    saveTimeout = setTimeout(async () => {
+      if (needsSave) {
+        await doSaveState();
+        needsSave = false;
+      }
+      saveTimeout = null;
+    }, 1000);
+  }
+}
+
+/**
+ * 実際のストレージ保存処理
+ */
+async function doSaveState() {
+  const stateData = {
     [StorageKey.TIMER_STATE]: currentState,
     [StorageKey.TIMER_SETTINGS]: settings
-  });
+  };
+
+  try {
+    // まずsyncストレージに保存を試行
+    await chrome.storage.sync.set(stateData);
+  } catch (error) {
+    console.error('sync ストレージ保存エラー:', error);
+
+    // syncストレージが失敗した場合、localストレージにフォールバック
+    try {
+      await chrome.storage.local.set(stateData);
+      console.log('localストレージにフォールバック保存しました');
+    } catch (localError) {
+      console.error('local ストレージ保存エラー:', localError);
+    }
+  }
 }
 
 /**
@@ -287,16 +352,19 @@ async function saveState() {
  */
 chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendResponse) => {
   const { action } = message;
+  let stateChanged = false;
 
   switch (action) {
     case MessageAction.START:
       currentState = startTimer(currentState);
       startTimerCheck();
+      stateChanged = true;
       break;
 
     case MessageAction.STOP:
       currentState = pauseTimer(currentState);
       stopTimerCheck();
+      stateChanged = true;
       break;
 
     case MessageAction.RESET:
@@ -310,6 +378,7 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
       // 作業セッションに戻す
       currentState = createTimerState(SessionType.Work, settings);
       stopTimerCheck();
+      stateChanged = true;
       break;
 
     case MessageAction.GET_STATE:
@@ -336,26 +405,39 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
         // 通常のタイマー設定を更新
         if (message.payload.soundEnabled !== undefined) {
           settings = { ...settings, soundEnabled: message.payload.soundEnabled };
+          stateChanged = true;
         }
 
         // 時間設定を更新
         if (message.payload.timeSettings) {
           timeSettings = message.payload.timeSettings;
           updateTimerSettingsFromTimeSettings();
+          stateChanged = true;
         }
 
         // サイクル設定を更新
         if (message.payload.cycleSettings) {
           cycleSettings = message.payload.cycleSettings;
+          stateChanged = true;
           // サイクル設定も保存
-          await chrome.storage.sync.set({
-            'cycleSettings': cycleSettings
-          });
+          try {
+            await chrome.storage.sync.set({
+              'cycleSettings': cycleSettings
+            });
+          } catch (error) {
+            console.error('サイクル設定保存エラー:', error);
+          }
         }
 
-        await chrome.storage.sync.set({
-          [StorageKey.TIMER_SETTINGS]: settings
-        });
+        if (stateChanged) {
+          try {
+            await chrome.storage.sync.set({
+              [StorageKey.TIMER_SETTINGS]: settings
+            });
+          } catch (error) {
+            console.error('設定保存エラー:', error);
+          }
+        }
       }
       break;
 
@@ -390,7 +472,12 @@ chrome.runtime.onMessage.addListener(async (message: Message, _sender, sendRespo
       break;
   }
 
-  saveState();
+  // 状態変更があった場合のみ保存
+  if (stateChanged) {
+    await saveState();
+  }
+
+  // バッジ更新（軽量なので毎回実行）
   updateBadge();
 
   // 非同期にレスポンスを返す場合はtrue

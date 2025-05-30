@@ -6,10 +6,24 @@ export class KanbanBoard {
   private tasks: Task[] = [];
   private dayPlan: DayPlan | null = null;
   private onTaskUpdate?: () => void;
+  private isRendering: boolean = false; // render重複防止フラグ
+
+  // イベントハンドラーをメンバ変数として保存
+  private boundHandleDragStart: (event: DragEvent) => void;
+  private boundHandleDragOver: (event: DragEvent) => void;
+  private boundHandleDrop: (event: DragEvent) => Promise<void>;
+  private boundHandleClick: (event: Event) => Promise<void>;
 
   constructor(container: HTMLElement, onTaskUpdate?: () => void) {
     this.container = container;
     this.onTaskUpdate = onTaskUpdate;
+
+    // イベントハンドラーをバインド
+    this.boundHandleDragStart = this.handleDragStart.bind(this);
+    this.boundHandleDragOver = this.handleDragOver.bind(this);
+    this.boundHandleDrop = this.handleDrop.bind(this);
+    this.boundHandleClick = this.handleClick.bind(this);
+
     this.init();
   }
 
@@ -24,6 +38,9 @@ export class KanbanBoard {
   }
 
   private render() {
+    if (this.isRendering) return;
+    this.isRendering = true;
+
     this.container.innerHTML = `
       <div class="kanban-board">
         <div class="kanban-columns">
@@ -35,6 +52,7 @@ export class KanbanBoard {
     `;
 
     this.attachEventListeners();
+    this.isRendering = false; // フラグリセット
   }
 
   private renderColumn(title: string, status: TaskStatus): string {
@@ -62,23 +80,38 @@ export class KanbanBoard {
     const assignedSlots = this.dayPlan?.slots.filter(slot => slot.taskId === task.id) || [];
     const completedSlots = assignedSlots.filter(slot => slot.completed).length;
     const isInProgress = task.status === TaskStatus.Doing && assignedSlots.length > 0;
+    const isInPlan = assignedSlots.length > 0;
+
+    const shouldShowPlanButton = task.status === TaskStatus.Backlog && !isInPlan;
+
+    const planButtonHtml = shouldShowPlanButton ? `
+              <button class="task-add-to-plan-btn" data-task-id="${task.id}" title="今日のプランに追加">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+              </button>
+            ` : '';
 
     return `
-      <div class="task-card" data-task-id="${task.id}" draggable="true">
+      <div class="task-card ${isInPlan ? 'task-in-plan' : ''}" data-task-id="${task.id}" draggable="true">
         <div class="task-card-header">
           <span class="task-card-title">${task.name}</span>
-          ${task.status === TaskStatus.Backlog ? `
-            <button class="task-card-delete" data-task-id="${task.id}" title="タスクを削除">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          ` : ''}
+          <div class="task-card-actions">
+            ${planButtonHtml}
+            ${task.status === TaskStatus.Backlog ? `
+              <button class="task-card-delete" data-task-id="${task.id}" title="タスクを削除">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            ` : ''}
+          </div>
         </div>
         ${task.description ? `<div class="task-card-description">${task.description}</div>` : ''}
         <div class="task-card-progress">
           <span class="progress-text">${progressText}</span>
           ${isInProgress ? `<span class="progress-slots">(${completedSlots}/${assignedSlots.length})</span>` : ''}
+          ${isInPlan && !isInProgress ? `<span class="plan-indicator">📅 プラン済み</span>` : ''}
         </div>
         ${task.status === TaskStatus.Done && task.completedAt ? `
           <div class="task-card-completed">
@@ -102,14 +135,14 @@ export class KanbanBoard {
 
   private attachEventListeners() {
     // ドラッグ&ドロップイベント
-    this.container.addEventListener('dragstart', this.handleDragStart.bind(this));
-    this.container.addEventListener('dragover', this.handleDragOver.bind(this));
-    this.container.addEventListener('drop', this.handleDrop.bind(this));
+    this.container.addEventListener('dragstart', this.boundHandleDragStart);
+    this.container.addEventListener('dragover', this.boundHandleDragOver);
+    this.container.addEventListener('drop', this.boundHandleDrop);
 
-    // タスク削除
-    this.container.addEventListener('click', this.handleClick.bind(this));
+    // クリックイベント（タスク削除、プラン追加）
+    this.container.addEventListener('click', this.boundHandleClick);
 
-    // 新しいタスク追加
+    // 新しいタスク追加ボタン
     const addButton = this.container.querySelector('#addTaskButton');
     if (addButton) {
       addButton.addEventListener('click', this.handleAddTask.bind(this));
@@ -153,16 +186,37 @@ export class KanbanBoard {
   }
 
   private async handleClick(event: Event) {
-    if (event.target instanceof HTMLElement) {
-      // タスク削除
-      if (event.target.classList.contains('task-card-delete') ||
-          event.target.closest('.task-card-delete')) {
-        const button = event.target.closest('.task-card-delete') as HTMLElement;
-        const taskId = button?.dataset.taskId;
-        if (taskId) {
-          await this.deleteTask(taskId);
+    try {
+      // HTMLElementまたはSVGElementの場合に処理
+      if (event.target instanceof HTMLElement || event.target instanceof SVGElement) {
+        const target = event.target as Element;
+
+        // プラン追加ボタン（SVGクリックにも対応）
+        const planButtonElement = target.closest('.task-add-to-plan-btn');
+        if (planButtonElement) {
+          event.stopPropagation(); // イベント伝搬を止める
+          const button = planButtonElement as HTMLElement;
+          const taskId = button.dataset.taskId;
+          if (taskId) {
+            await this.addTaskToPlan(taskId);
+          }
+          return;
+        }
+
+        // タスク削除（SVGクリックにも対応）
+        const deleteButtonElement = target.closest('.task-card-delete');
+        if (deleteButtonElement) {
+          event.stopPropagation(); // イベント伝搬を止める
+          const button = deleteButtonElement as HTMLElement;
+          const taskId = button.dataset.taskId;
+          if (taskId) {
+            await this.deleteTask(taskId);
+          }
+          return;
         }
       }
+    } catch (error) {
+      console.error('🚨 Error in handleClick:', error);
     }
   }
 
@@ -183,14 +237,67 @@ export class KanbanBoard {
     const { createTask, addTask } = await import('../utils/storage');
     const newTask = createTask(name, description, estimatePomodoros);
     await addTask(newTask);
-    await this.refresh();
+    await this.refreshSilent();
+
+    if (this.onTaskUpdate) {
+      this.onTaskUpdate();
+    }
   }
 
   private async deleteTask(taskId: string) {
     if (confirm('このタスクを削除してもよろしいですか？')) {
       const { deleteTask } = await import('../utils/storage');
       await deleteTask(taskId);
-      await this.refresh();
+      await this.refreshSilent();
+
+      if (this.onTaskUpdate) {
+        this.onTaskUpdate();
+      }
+    }
+  }
+
+  private async addTaskToPlan(taskId: string) {
+    console.log('addTaskToPlan called with taskId:', taskId);
+
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) {
+      console.error('Task not found:', taskId);
+      return;
+    }
+
+    console.log('Task found:', task);
+    console.log('DayPlan:', this.dayPlan);
+
+    try {
+      // 空のスロットを見つけて、必要な分だけ連続して割り当て
+      const { assignTaskToSlot } = await import('../utils/storage');
+      const emptySlots = this.dayPlan?.slots.filter(slot => !slot.taskId) || [];
+
+      console.log('Empty slots:', emptySlots.length, 'Required:', task.estimatePomodoros);
+
+      if (emptySlots.length < task.estimatePomodoros) {
+        alert(`空きスロットが不足しています。必要: ${task.estimatePomodoros}個、利用可能: ${emptySlots.length}個`);
+        return;
+      }
+
+      // 最初の空きスロットから必要な分だけ割り当て
+      const firstEmptySlotId = emptySlots[0].id;
+      console.log('Assigning task to slot:', firstEmptySlotId);
+
+      await assignTaskToSlot(firstEmptySlotId, taskId, task.estimatePomodoros);
+
+      await this.refreshSilent();
+
+      if (this.onTaskUpdate) {
+        this.onTaskUpdate();
+      }
+
+      // 成功メッセージは削除（コンソールログのみ）
+      console.log(`「${task.name}」を今日のプランに追加しました`);
+
+    } catch (error) {
+      console.error('プランへの追加に失敗しました:', error);
+      alert('プランへの追加に失敗しました。');
     }
   }
 
@@ -215,6 +322,12 @@ export class KanbanBoard {
     if (this.onTaskUpdate) {
       this.onTaskUpdate();
     }
+  }
+
+  public async refreshSilent() {
+    // onTaskUpdateコールバックを呼ばないrefresh
+    await this.loadData();
+    this.render();
   }
 
   public getTasksByStatus(status: TaskStatus): Task[] {

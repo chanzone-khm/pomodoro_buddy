@@ -88,6 +88,57 @@
 	flex: 1;
 }
 
+.task-card-actions {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+/* プラン追加ボタンをより目立たせる */
+.task-add-to-plan-btn {
+	background: linear-gradient(135deg, #10b981, #059669);
+	color: white;
+	border: none;
+	border-radius: 6px;
+	padding: 6px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s;
+	box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+	min-width: 24px;
+	height: 24px;
+	position: relative;
+}
+
+.task-add-to-plan-btn:hover {
+	background: linear-gradient(135deg, #059669, #047857);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+}
+
+.task-add-to-plan-btn:active {
+	transform: translateY(0);
+	box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+/* ツールチップスタイル */
+.task-add-to-plan-btn:hover::before {
+	content: "今日のプランに追加";
+	position: absolute;
+	top: -35px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.8);
+	color: white;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 11px;
+	white-space: nowrap;
+	z-index: 1000;
+}
+
 .task-card-delete {
 	background: none;
 	border: none;
@@ -96,7 +147,6 @@
 	padding: 4px;
 	border-radius: 4px;
 	transition: all 0.2s ease;
-	margin-left: 8px;
 }
 
 .task-card-delete:hover {
@@ -217,6 +267,21 @@
 	min-height: 80px;
 }
 
+/* スロットのドラッグ&ドロップスタイル */
+.slot[draggable="true"] {
+	cursor: move;
+}
+
+.slot[draggable="true"]:hover {
+	transform: scale(1.02);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slot.dragging {
+	opacity: 0.5;
+	transform: rotate(2deg);
+}
+
 .slot-empty {
 	background: #f8fafc;
 	border-style: dashed;
@@ -294,31 +359,58 @@
 	color: #6b7280;
 }
 
-.slot-remove-btn {
+.slot-actions {
 	position: absolute;
 	top: 4px;
 	right: 4px;
+	display: flex;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+}
+
+.slot:hover .slot-actions {
+	opacity: 1;
+}
+
+.slot-complete-btn {
+	background: rgba(16, 185, 129, 0.9);
+	border: none;
+	border-radius: 50%;
+	width: 18px;
+	height: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: white;
+	transition: all 0.2s ease;
+}
+
+.slot-complete-btn:hover {
+	background: #059669;
+	transform: scale(1.1);
+}
+
+.slot-remove-btn {
+	position: static;
 	background: rgba(255, 255, 255, 0.9);
 	border: none;
 	border-radius: 50%;
-	width: 20px;
-	height: 20px;
+	width: 18px;
+	height: 18px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
 	color: #6b7280;
 	transition: all 0.2s ease;
-	opacity: 0;
-}
-
-.slot:hover .slot-remove-btn {
-	opacity: 1;
 }
 
 .slot-remove-btn:hover {
 	background: #fef2f2;
 	color: #ef4444;
+	transform: scale(1.1);
 }
 
 /* レスポンシブ対応 */
@@ -366,4 +458,16 @@
 
 .slot {
 	animation: slideIn 0.2s ease-out;
+}
+
+/* プラン済みタスクのスタイリング */
+.task-card.task-in-plan {
+	border-color: #059669;
+	background: #f0fdf4;
+}
+
+.plan-indicator {
+	color: #059669;
+	font-size: 11px;
+	font-weight: 500;
 }
