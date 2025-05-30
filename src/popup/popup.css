@@ -353,4 +353,114 @@
 			transform: translateY(0);
 		}
 	}
+
+	/* カンバンセクション */
+	.kanban-section {
+		max-height: 0;
+		opacity: 0;
+		visibility: hidden;
+		transition: all 0.3s ease-in-out;
+	}
+
+	.kanban-section.expanded {
+		max-height: 800px;
+		opacity: 1;
+		visibility: visible;
+	}
+
+	/* カンバン展開時のポップアップ全体の調整 */
+	body:has(.kanban-section.expanded) {
+		min-width: 400px;
+		max-width: 500px;
+	}
+
+	/* カンバンコンテンツの調整 */
+	.kanban-content {
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		background: #f9fafb;
+		max-height: 700px;
+		overflow-y: auto;
+	}
+
+	/* カンバン内のタスクマネージャーコンテナ */
+	#kanban-task-manager {
+		min-height: 400px;
+		max-height: 600px;
+		overflow-y: auto;
+	}
+
+	.kanban-toggle {
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		transition: all 0.2s ease;
+	}
+
+	.kanban-toggle:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	/* アイコンの回転アニメーション */
+	.kanban-toggle-icon {
+		transition: transform 0.3s ease;
+	}
+
+	.kanban-toggle-icon.rotated {
+		transform: rotate(180deg);
+	}
+
+	/* カンバン内のタスクカードスタイル */
+	.task-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		padding: 8px 12px;
+		margin-bottom: 8px;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.task-card:hover {
+		border-color: #3b82f6;
+		box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+	}
+
+	.task-card.dragging {
+		opacity: 0.5;
+		transform: rotate(2deg);
+	}
+
+	/* カンバンカラムスタイル */
+	.kanban-column {
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		padding: 12px;
+		min-height: 200px;
+	}
+
+	.kanban-column-header {
+		font-weight: 600;
+		color: #475569;
+		margin-bottom: 12px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #e2e8f0;
+	}
+
+	/* ドラッグ&ドロップのスタイル */
+	.drag-over {
+		background-color: #eff6ff;
+		border-color: #3b82f6;
+	}
+
+	/* レスポンシブ対応 */
+	@media (max-width: 400px) {
+		.kanban-section.expanded {
+			max-height: 500px;
+		}
+
+		.kanban-content {
+			padding: 12px;
+		}
+	}
 }

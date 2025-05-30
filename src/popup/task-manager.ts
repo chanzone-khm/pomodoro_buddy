@@ -168,7 +168,7 @@ async function updateStatistics() {
  */
 function setupMessageListeners() {
   // ポップアップからの変更通知を受信
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     console.log('📩 カンバンでメッセージ受信:', message);
 
     switch (message.action) {

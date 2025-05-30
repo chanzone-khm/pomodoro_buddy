@@ -65,8 +65,17 @@ const soundEnabledCheckbox = document.getElementById('sound-enabled') as HTMLInp
 const testWorkSoundBtn = document.getElementById('test-work-sound') as HTMLButtonElement;
 const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLButtonElement;
 
-// タスク管理関連のエレメント（カンバンボタンのみ残す）
-const openTaskManagerBtn = document.getElementById('open-task-manager-btn') as HTMLButtonElement;
+// カンバンセクション関連のエレメント
+const kanbanToggle = document.getElementById('kanban-toggle') as HTMLButtonElement;
+const kanbanToggleIcon = document.getElementById('kanban-toggle-icon') as HTMLElement;
+const kanbanSection = document.getElementById('kanban-section') as HTMLElement;
+const kanbanTaskManager = document.getElementById('kanban-task-manager') as HTMLElement;
+const kanbanDaySummary = document.getElementById('kanban-day-summary') as HTMLElement;
+const kanbanSettingsToggle = document.getElementById('kanban-settings-toggle') as HTMLButtonElement;
+const kanbanSettingsPanel = document.getElementById('kanban-settings-panel') as HTMLElement;
+const kanbanDailySlotsSelect = document.getElementById('kanban-daily-slots') as HTMLSelectElement;
+const clearTodayPlanBtn = document.getElementById('clear-today-plan-btn') as HTMLButtonElement;
+const clearAllTasksBtn = document.getElementById('clear-all-tasks-btn') as HTMLButtonElement;
 
 // プログレスバー関連のエレメント
 const progressBarContainer = document.getElementById('progress-bar-container') as HTMLElement;
@@ -111,12 +120,15 @@ let timeSettings: TimeSettings = DEFAULT_TIME_SETTINGS;
 // タスク管理の状態
 let currentTask: Task | null = null;
 let allTasks: Task[] = [];
-let editingTaskId: string | null = null;
 
 // プラン管理の状態
 let dayPlan: any = null;
 let currentSlot: any = null;
 let nextSlot: any = null;
+
+// カンバン管理の状態
+let kanbanExpanded = false;
+let taskManager: any = null;
 
 /**
  * 初期化
@@ -137,27 +149,6 @@ async function initialize() {
   // タスク管理の初期化
   await initializeTasks();
 
-  // カンバンからの変更通知を受信
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.action === 'TASK_UPDATED' || message.action === 'PLAN_UPDATED') {
-      console.log('📩 カンバンからの変更通知を受信:', message.action);
-      handleExternalUpdate();
-    }
-  });
-
-  // ストレージの変更も監視（カンバンからの直接変更を検出）
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    console.log('💾 ポップアップでストレージ変更を検出:', changes, areaName);
-
-    // プランやタスクの変更を検出（他のタブ/ウィンドウからの変更）
-    if ((changes.day_plans || changes.tasks) && areaName === 'local') {
-      console.log('🔄 重要な変更を検出 - ポップアップを更新');
-      setTimeout(() => {
-        handleExternalUpdate();
-      }, 200);
-    }
-  });
-
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
   pauseBtn.addEventListener('click', handlePauseClick);
@@ -169,8 +160,12 @@ async function initialize() {
   testWorkSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Work));
   testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
 
-  // タスク管理関連のイベントリスナー
-  openTaskManagerBtn.addEventListener('click', handleOpenTaskManagerClick);
+  // カンバンセクション関連のイベントリスナー
+  kanbanToggle.addEventListener('click', handleKanbanToggle);
+  kanbanSettingsToggle.addEventListener('click', handleKanbanSettingsToggle);
+  kanbanDailySlotsSelect.addEventListener('change', handleKanbanDailySlotsChange);
+  clearTodayPlanBtn.addEventListener('click', handleClearTodayPlan);
+  clearAllTasksBtn.addEventListener('click', handleClearAllTasks);
 
   // プログレスバー関連のイベントリスナー
   progressEnabledCheckbox.addEventListener('change', handleProgressEnabledChange);
@@ -188,6 +183,9 @@ async function initialize() {
   shortBreakDurationSelect.addEventListener('change', handleShortBreakDurationChange);
   longBreakDurationSelect.addEventListener('change', handleLongBreakDurationChange);
 
+  // メッセージリスナーを設定（カンバンからの変更通知を受信）
+  setupMessageListeners();
+
   // 最初の表示更新
   updateDisplay();
   updateSettingsDisplay();
@@ -198,6 +196,93 @@ async function initialize() {
 
   // 定期的に状態を更新
   startDisplayUpdate();
+
+  // カンバンの展開状態を復元
+  await restoreKanbanState();
+}
+
+/**
+ * メッセージリスナーを設定（カンバンからの変更通知を受信）
+ */
+function setupMessageListeners() {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    console.log('📩 ポップアップでメッセージ受信:', message);
+
+    switch (message.action) {
+      case 'PLAN_UPDATED':
+        console.log('🔄 プラン更新通知を受信 - ポップアップを更新');
+        handlePlanUpdateFromKanban(message.data);
+        break;
+
+      case 'TASK_UPDATED':
+        console.log('🔄 タスク更新通知を受信 - ポップアップを更新');
+        handleTaskUpdateFromKanban(message.data);
+        break;
+
+      default:
+        console.log('❓ 未知のメッセージ:', message.action);
+    }
+
+    // 応答を送信
+    sendResponse({ received: true });
+  });
+
+  console.log('✅ ポップアップメッセージリスナー設定完了');
+}
+
+/**
+ * カンバンからのプラン更新通知を処理
+ */
+async function handlePlanUpdateFromKanban(data?: any) {
+  try {
+    console.log('🔄 カンバンからのプラン更新処理開始:', data);
+
+    // プラン情報を再読み込み
+    await initializePlan();
+
+    // 表示を更新
+    await updateCurrentTaskDisplay();
+    updatePlanDisplay();
+
+    // カンバンが展開されている場合はサマリーも更新
+    if (kanbanExpanded && taskManager) {
+      await updateKanbanDaySummary();
+    }
+
+    console.log('✅ カンバンからのプラン更新処理完了');
+  } catch (error) {
+    console.error('❌ カンバンからのプラン更新処理エラー:', error);
+  }
+}
+
+/**
+ * カンバンからのタスク更新通知を処理
+ */
+async function handleTaskUpdateFromKanban(data?: any) {
+  try {
+    console.log('🔄 カンバンからのタスク更新処理開始:', data);
+
+    // タスク情報を再読み込み
+    allTasks = await getAllTasks();
+    currentTask = await getCurrentTask();
+
+    // プラン情報も再読み込み（タスクとプランの整合性確保）
+    await initializePlan();
+
+    // 表示を更新
+    await updateCurrentTaskDisplay();
+    updatePlanDisplay();
+
+    // カンバンが展開されている場合は更新
+    if (kanbanExpanded && taskManager) {
+      await refreshTaskManager();
+      await updateKanbanDaySummary();
+    }
+
+    console.log('✅ カンバンからのタスク更新処理完了');
+  } catch (error) {
+    console.error('❌ カンバンからのタスク更新処理エラー:', error);
+  }
 }
 
 /**
@@ -1129,27 +1214,6 @@ async function handlePlanItemComplete(taskId: string) {
       console.log('✅ タスクの実績ポモドーロ数更新完了');
     }
 
-    // 即座にカンバンに変更を通知（複数回送信で確実性を向上）
-    console.log('📤 カンバンに完了通知送信中...');
-    const notificationMessage = {
-      action: 'PLAN_UPDATED',
-      data: {
-        completed: true,
-        taskId: taskId,
-        slotId: currentSlot.id,
-        timestamp: Date.now()
-      }
-    };
-
-    // 即座に送信
-    chrome.runtime.sendMessage(notificationMessage);
-
-    // 少し遅延してから再送信（確実性のため）
-    setTimeout(() => {
-      chrome.runtime.sendMessage(notificationMessage);
-      console.log('📤 カンバンに再送信完了');
-    }, 50);
-
     // プラン情報を再読み込み
     await initializePlan();
 
@@ -1160,6 +1224,12 @@ async function handlePlanItemComplete(taskId: string) {
     // 表示を更新
     await updateCurrentTaskDisplay();
     updatePlanDisplay();
+
+    // カンバンが展開されている場合は更新
+    if (kanbanExpanded && taskManager) {
+      await refreshTaskManager();
+      await updateKanbanDaySummary();
+    }
 
     console.log('✅ プランアイテム完了処理完了');
 
@@ -1282,15 +1352,14 @@ async function reorderPlanTasks(draggedTaskId: string, targetTaskId: string) {
 
     console.log('✅ プラン並び替え完了');
 
-    // カンバンに変更を通知
-    console.log('📤 カンバンに並び替え通知送信');
-    chrome.runtime.sendMessage({
-      action: 'PLAN_UPDATED',
-      data: { reordered: true }
-    });
-
     // プラン情報を再読み込み
     await initializePlan();
+
+    // カンバンが展開されている場合は更新
+    if (kanbanExpanded && taskManager) {
+      await refreshTaskManager();
+      await updateKanbanDaySummary();
+    }
 
     console.log('✅ プランタスク並び替え完了');
 
@@ -1391,38 +1460,260 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * 外部（カンバン）からの変更通知ハンドラー
+ * カンバンセクションの展開/折りたたみ
  */
-async function handleExternalUpdate() {
-  console.log('🔄 外部変更による更新開始');
+function handleKanbanToggle() {
+  kanbanExpanded = !kanbanExpanded;
 
+  if (kanbanExpanded) {
+    expandKanban();
+  } else {
+    collapseKanban();
+  }
+
+  // 状態を保存
+  localStorage.setItem('kanban-expanded', kanbanExpanded.toString());
+}
+
+/**
+ * カンバンを展開
+ */
+async function expandKanban() {
+  console.log('🔧 カンバン展開開始');
+
+  // アニメーション
+  kanbanSection.classList.add('expanded');
+  kanbanToggleIcon.classList.add('rotated');
+  kanbanToggleIcon.textContent = '▲';
+
+  // TaskManagerを初期化（初回のみ）
+  if (!taskManager) {
+    await initializeTaskManager();
+  } else {
+    // 既に初期化済みの場合は更新のみ
+    await refreshTaskManager();
+  }
+
+  // サマリーを更新
+  await updateKanbanDaySummary();
+
+  console.log('✅ カンバン展開完了');
+}
+
+/**
+ * カンバンを折りたたみ
+ */
+function collapseKanban() {
+  console.log('🔧 カンバン折りたたみ');
+
+  kanbanSection.classList.remove('expanded');
+  kanbanToggleIcon.classList.remove('rotated');
+  kanbanToggleIcon.textContent = '▼';
+}
+
+/**
+ * TaskManagerを初期化
+ */
+async function initializeTaskManager() {
   try {
-    // タスクデータを再取得（少し待ってからリトライ）
-    await new Promise(resolve => setTimeout(resolve, 100));
-    allTasks = await getAllTasks();
-    console.log('📋 タスクデータ再取得:', { count: allTasks.length });
+    console.log('🔄 TaskManager初期化開始');
 
-    // 現在のタスクも更新
-    currentTask = await getCurrentTask();
+    // TaskManagerをインポート
+    const { TaskManager } = await import('../components/TaskManager');
 
-    // プラン情報を再初期化
-    await initializePlan();
+    // スタイルを読み込み
+    TaskManager.loadStyles();
 
-    // 表示を更新
-    await updateCurrentTaskDisplay();
-    updatePlanDisplay();
+    // TaskManagerインスタンスを作成
+    taskManager = new TaskManager(kanbanTaskManager);
 
-    console.log('✅ 外部変更による更新完了');
+    console.log('✅ TaskManager初期化完了');
   } catch (error) {
-    console.error('❌ 外部変更による更新に失敗:', error);
+    console.error('❌ TaskManager初期化エラー:', error);
+    kanbanTaskManager.innerHTML = '<div class="text-red-500 text-center p-4">カンバンの読み込みに失敗しました</div>';
   }
 }
 
 /**
- * タスクマネージャーを開くハンドラー
+ * TaskManagerを更新
  */
-function handleOpenTaskManagerClick() {
-  window.open(chrome.runtime.getURL('src/popup/task-manager.html'), '_blank', 'width=900,height=700');
+async function refreshTaskManager() {
+  try {
+    if (taskManager && typeof taskManager.refresh === 'function') {
+      await taskManager.refresh();
+    }
+  } catch (error) {
+    console.error('❌ TaskManager更新エラー:', error);
+  }
+}
+
+/**
+ * カンバンの日次サマリーを更新
+ */
+async function updateKanbanDaySummary() {
+  try {
+    if (!taskManager) return;
+
+    const summary = await taskManager.getDayPlanSummary();
+    const todayString = new Date().toLocaleDateString('ja-JP', {
+      month: 'short',
+      day: 'numeric',
+      weekday: 'short'
+    });
+
+    kanbanDaySummary.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="text-gray-500">${todayString}</span>
+        <div class="flex items-center gap-1">
+          <span class="text-green-600 font-medium">${summary.completed}</span>
+          <span class="text-gray-400">/</span>
+          <span class="text-blue-600 font-medium">${summary.planned}</span>
+          <span class="text-gray-500 text-xs">🍅</span>
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error('❌ サマリー更新エラー:', error);
+    kanbanDaySummary.textContent = '読み込み中...';
+  }
+}
+
+/**
+ * カンバン設定パネルの表示/非表示
+ */
+function handleKanbanSettingsToggle() {
+  kanbanSettingsPanel.classList.toggle('hidden');
+}
+
+/**
+ * スロット数変更ハンドラー
+ */
+async function handleKanbanDailySlotsChange() {
+  try {
+    const newSlotCount = parseInt(kanbanDailySlotsSelect.value, 10);
+
+    // 設定を保存
+    const { getStorageData, setStorageData } = await import('../utils/storage.js');
+    const { StorageKey } = await import('../types/index.js');
+    const timerSettings: any = await getStorageData(StorageKey.TIMER_SETTINGS) || {};
+    timerSettings.dailySlots = newSlotCount;
+    await setStorageData(StorageKey.TIMER_SETTINGS, timerSettings);
+
+    // TaskManagerを更新
+    await refreshTaskManager();
+    await updateKanbanDaySummary();
+
+    // プラン表示も更新
+    await initializePlan();
+    updatePlanDisplay();
+
+    console.log('✅ スロット数更新完了:', newSlotCount);
+    showToast('スロット数を更新しました', 'success');
+  } catch (error) {
+    console.error('❌ スロット数更新エラー:', error);
+    showToast('スロット数の更新に失敗しました', 'error');
+  }
+}
+
+/**
+ * 今日のプランクリア
+ */
+async function handleClearTodayPlan() {
+  if (!confirm('今日のプランをクリアしますか？この操作は取り消せません。')) {
+    return;
+  }
+
+  try {
+    const { createDayPlan, updateDayPlan, getStorageData } = await import('../utils/storage.js');
+    const { StorageKey } = await import('../types/index.js');
+
+    const todayKey = new Date().toISOString().split('T')[0];
+    const timerSettings: any = await getStorageData(StorageKey.TIMER_SETTINGS);
+    const slotCount = timerSettings?.dailySlots || 6;
+
+    const newPlan = createDayPlan(todayKey, slotCount);
+    await updateDayPlan(newPlan);
+
+    // 表示を更新
+    await refreshTaskManager();
+    await updateKanbanDaySummary();
+    await initializePlan();
+    updatePlanDisplay();
+
+    console.log('✅ プランクリア完了');
+    showToast('今日のプランをクリアしました', 'success');
+  } catch (error) {
+    console.error('❌ プランクリアエラー:', error);
+    showToast('プランのクリアに失敗しました', 'error');
+  }
+}
+
+/**
+ * 全タスク削除
+ */
+async function handleClearAllTasks() {
+  if (!confirm('すべてのタスクを削除しますか？この操作は取り消せません。')) {
+    return;
+  }
+
+  try {
+    const { setStorageData } = await import('../utils/storage.js');
+    const { StorageKey } = await import('../types/index.js');
+
+    // 全タスクを削除
+    await setStorageData(StorageKey.TASKS, []);
+
+    // 今日のプランもクリア
+    await handleClearTodayPlan();
+
+    // ローカル状態も更新
+    allTasks = [];
+    currentTask = null;
+
+    // 表示を更新
+    await updateCurrentTaskDisplay();
+
+    console.log('✅ 全タスク削除完了');
+    showToast('すべてのタスクを削除しました', 'success');
+  } catch (error) {
+    console.error('❌ 全タスク削除エラー:', error);
+    showToast('タスクの削除に失敗しました', 'error');
+  }
+}
+
+/**
+ * トースト通知表示
+ */
+function showToast(message: string, type: 'success' | 'error') {
+  const toast = document.createElement('div');
+  toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 text-white text-sm ${
+    type === 'success' ? 'bg-green-600' : 'bg-red-600'
+  }`;
+  toast.textContent = message;
+
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+/**
+ * カンバンの展開状態を復元
+ */
+async function restoreKanbanState() {
+  try {
+    const savedState = localStorage.getItem('kanban-expanded');
+    kanbanExpanded = savedState === 'true';
+
+    if (kanbanExpanded) {
+      await expandKanban();
+    }
+
+    console.log('✅ カンバン状態復元完了:', { expanded: kanbanExpanded });
+  } catch (error) {
+    console.error('❌ カンバン状態復元エラー:', error);
+  }
 }
 
 // 初期化時に実行
