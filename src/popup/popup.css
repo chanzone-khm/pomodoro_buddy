@@ -196,4 +196,161 @@
 	.task-list::-webkit-scrollbar-thumb {
 		@apply bg-gray-300 rounded hover:bg-gray-400;
 	}
+
+	/* 今日のプラン一覧 */
+	.plan-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 6px;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 4px;
+		font-size: 11px;
+		transition: all 0.2s ease;
+	}
+
+	.plan-item:hover {
+		border-color: #d1d5db;
+		background: #f9fafb;
+		transform: translateY(-1px);
+	}
+
+	.plan-item.current {
+		border-color: #10b981;
+		background: #f0fdf4;
+	}
+
+	.plan-item.completed {
+		background: #f3f4f6;
+		opacity: 0.8;
+	}
+
+	.plan-item-status {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 8px;
+		font-weight: bold;
+	}
+
+	.plan-item-status.pending {
+		background: #f3f4f6;
+		border: 1px solid #d1d5db;
+		color: #6b7280;
+	}
+
+	.plan-item-status.current {
+		background: #10b981;
+		color: white;
+	}
+
+	.plan-item-status.completed {
+		background: #059669;
+		color: white;
+	}
+
+	.plan-item-name {
+		flex: 1;
+		color: #374151;
+		font-weight: 500;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.plan-item.completed .plan-item-name {
+		color: #6b7280;
+		text-decoration: line-through;
+	}
+
+	.plan-item-progress {
+		color: #6b7280;
+		font-size: 10px;
+		font-weight: normal;
+	}
+
+	.plan-empty {
+		text-align: center;
+		color: #9ca3af;
+		font-size: 11px;
+		padding: 8px;
+	}
+
+	/* プラン完了ボタン */
+	.plan-item-actions {
+		display: flex;
+		gap: 2px;
+		align-items: center;
+	}
+
+	.plan-complete-btn {
+		background: linear-gradient(135deg, #10b981, #059669);
+		border: 1px solid white;
+		border-radius: 50%;
+		width: 16px;
+		height: 16px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		color: white;
+		transition: all 0.2s ease;
+		box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+	}
+
+	.plan-complete-btn:hover {
+		background: linear-gradient(135deg, #059669, #047857);
+		transform: scale(1.1);
+		box-shadow: 0 2px 4px rgba(16, 185, 129, 0.5);
+	}
+
+	.plan-complete-btn:active {
+		transform: scale(1.05);
+	}
+
+	/* プランアイテムのドラッグ&ドロップ */
+	.plan-item[draggable="true"] {
+		cursor: move;
+	}
+
+	.plan-item.dragging {
+		opacity: 0.5;
+		transform: scale(0.95);
+		transition: all 0.2s ease;
+	}
+
+	.plan-item.drag-over {
+		border-color: #3b82f6 !important;
+		background: #dbeafe !important;
+		transform: scale(1.02);
+	}
+
+	/* 次プラン表示 */
+	#next-plan-section {
+		animation: slideInUp 0.3s ease-out;
+	}
+
+	#next-plan-task {
+		max-width: 200px;
+		margin: 0 auto;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	@keyframes slideInUp {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
 }

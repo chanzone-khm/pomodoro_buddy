@@ -58,6 +58,9 @@ async function initialize() {
     // イベントリスナーを設定
     setupEventListeners();
 
+    // ポップアップからのメッセージリスナーを設定
+    setupMessageListeners();
+
     console.log('タスクマネージャーが初期化されました');
   } catch (error) {
     console.error('初期化エラー:', error);
@@ -157,6 +160,99 @@ async function updateStatistics() {
     }
   } catch (error) {
     console.error('統計更新エラー:', error);
+  }
+}
+
+/**
+ * メッセージリスナーを設定
+ */
+function setupMessageListeners() {
+  // ポップアップからの変更通知を受信
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('📩 カンバンでメッセージ受信:', message);
+
+    switch (message.action) {
+      case 'PLAN_UPDATED':
+        console.log('🔄 プラン更新通知を受信 - カンバン画面を更新');
+        handlePlanUpdate(message.data);
+        break;
+
+      case 'TASK_UPDATED':
+        console.log('🔄 タスク更新通知を受信 - カンバン画面を更新');
+        handleTaskUpdate(message.data);
+        break;
+
+      case 'POPUP_UPDATED':
+        console.log('📱 ポップアップ更新完了通知を受信');
+        break;
+
+      default:
+        console.log('❓ 未知のメッセージ:', message.action);
+    }
+
+    // 応答を送信（必要に応じて）
+    sendResponse({ received: true });
+  });
+
+  // ストレージの変更も監視（追加の同期メカニズム）
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    console.log('💾 ストレージ変更を検出:', changes, areaName);
+
+    // プランやタスクの変更を検出
+    if (changes.day_plans || changes.tasks) {
+      console.log('🔄 重要な変更を検出 - カンバンを更新');
+      setTimeout(async () => {
+        await handlePlanUpdate({ source: 'storage' });
+      }, 100);
+    }
+  });
+
+  console.log('✅ メッセージリスナー設定完了');
+}
+
+/**
+ * プラン更新処理
+ */
+async function handlePlanUpdate(data?: any) {
+  try {
+    console.log('🔄 プラン更新処理開始:', data);
+
+    // タスクマネージャーを再描画
+    if (taskManager) {
+      await taskManager.refresh();
+      console.log('✅ タスクマネージャー再描画完了');
+    }
+
+    // サマリーと統計を更新
+    await updateDaySummary();
+    await updateStatistics();
+
+    console.log('✅ プラン更新処理完了');
+  } catch (error) {
+    console.error('❌ プラン更新処理エラー:', error);
+  }
+}
+
+/**
+ * タスク更新処理
+ */
+async function handleTaskUpdate(data?: any) {
+  try {
+    console.log('🔄 タスク更新処理開始:', data);
+
+    // タスクマネージャーを再描画
+    if (taskManager) {
+      await taskManager.refresh();
+      console.log('✅ タスクマネージャー再描画完了');
+    }
+
+    // サマリーと統計を更新
+    await updateDaySummary();
+    await updateStatistics();
+
+    console.log('✅ タスク更新処理完了');
+  } catch (error) {
+    console.error('❌ タスク更新処理エラー:', error);
   }
 }
 

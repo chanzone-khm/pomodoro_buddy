@@ -242,6 +242,13 @@ export class KanbanBoard {
     if (this.onTaskUpdate) {
       this.onTaskUpdate();
     }
+
+    // ポップアップに変更通知を送信
+    try {
+      chrome.runtime.sendMessage({ action: 'TASK_UPDATED' });
+    } catch (error) {
+      console.log('⚠️ 変更通知送信失敗:', error);
+    }
   }
 
   private async deleteTask(taskId: string) {
@@ -253,50 +260,80 @@ export class KanbanBoard {
       if (this.onTaskUpdate) {
         this.onTaskUpdate();
       }
+
+      // ポップアップに変更通知を送信
+      try {
+        chrome.runtime.sendMessage({ action: 'TASK_UPDATED' });
+      } catch (error) {
+        console.log('⚠️ 変更通知送信失敗:', error);
+      }
     }
   }
 
   private async addTaskToPlan(taskId: string) {
-    console.log('addTaskToPlan called with taskId:', taskId);
+    console.log('🎯 プラン追加開始:', { taskId });
 
     const task = this.tasks.find(t => t.id === taskId);
     if (!task) {
-      console.error('Task not found:', taskId);
+      console.error('❌ タスクが見つかりません:', taskId);
       return;
     }
 
-    console.log('Task found:', task);
-    console.log('DayPlan:', this.dayPlan);
+    console.log('✅ タスク発見:', { id: task.id, name: task.name, estimate: task.estimatePomodoros });
+    console.log('📅 現在のdayPlan:', {
+      exists: !!this.dayPlan,
+      slotsCount: this.dayPlan?.slots?.length,
+      dayPlanData: this.dayPlan
+    });
 
     try {
       // 空のスロットを見つけて、必要な分だけ連続して割り当て
       const { assignTaskToSlot } = await import('../utils/storage');
       const emptySlots = this.dayPlan?.slots.filter(slot => !slot.taskId) || [];
 
-      console.log('Empty slots:', emptySlots.length, 'Required:', task.estimatePomodoros);
+      console.log('📊 スロット状況:', {
+        totalSlots: this.dayPlan?.slots?.length,
+        emptySlots: emptySlots.length,
+        requiredSlots: task.estimatePomodoros,
+        emptySlotIds: emptySlots.map(s => s.id)
+      });
 
       if (emptySlots.length < task.estimatePomodoros) {
+        console.warn('❌ 空きスロット不足');
         alert(`空きスロットが不足しています。必要: ${task.estimatePomodoros}個、利用可能: ${emptySlots.length}個`);
         return;
       }
 
       // 最初の空きスロットから必要な分だけ割り当て
       const firstEmptySlotId = emptySlots[0].id;
-      console.log('Assigning task to slot:', firstEmptySlotId);
+      console.log('🎯 スロット割り当て実行:', { slotId: firstEmptySlotId, taskId, pomodoros: task.estimatePomodoros });
 
       await assignTaskToSlot(firstEmptySlotId, taskId, task.estimatePomodoros);
+      console.log('✅ assignTaskToSlot完了');
 
+      console.log('🔄 データ更新開始');
       await this.refreshSilent();
+      console.log('✅ refreshSilent完了');
 
       if (this.onTaskUpdate) {
+        console.log('🔄 onTaskUpdate実行');
         this.onTaskUpdate();
+        console.log('✅ onTaskUpdate完了');
       }
 
-      // 成功メッセージは削除（コンソールログのみ）
-      console.log(`「${task.name}」を今日のプランに追加しました`);
+      // ポップアップに変更通知を送信
+      console.log('📤 ポップアップに変更通知送信');
+      try {
+        chrome.runtime.sendMessage({ action: 'PLAN_UPDATED' });
+        console.log('✅ 変更通知送信完了');
+      } catch (error) {
+        console.log('⚠️ 変更通知送信失敗（ポップアップが開いていない可能性）:', error);
+      }
+
+      console.log(`✅ プラン追加成功: 「${task.name}」を今日のプランに追加しました`);
 
     } catch (error) {
-      console.error('プランへの追加に失敗しました:', error);
+      console.error('❌ プランへの追加に失敗しました:', error);
       alert('プランへの追加に失敗しました。');
     }
   }

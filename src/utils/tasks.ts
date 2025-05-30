@@ -38,7 +38,7 @@ function generateTaskId(): string {
  */
 export async function getAllTasks(): Promise<Task[]> {
   try {
-    const result = await chrome.storage.sync.get(StorageKey.TASKS);
+    const result = await chrome.storage.local.get(StorageKey.TASKS);
     return result[StorageKey.TASKS] || [];
   } catch (error) {
     console.error('タスク取得エラー:', error);
@@ -60,7 +60,7 @@ export async function saveTask(task: Task): Promise<void> {
       tasks.push(task);
     }
 
-    await chrome.storage.sync.set({
+    await chrome.storage.local.set({
       [StorageKey.TASKS]: tasks
     });
   } catch (error) {
@@ -77,7 +77,7 @@ export async function deleteTask(taskId: string): Promise<void> {
     const tasks = await getAllTasks();
     const filteredTasks = tasks.filter(task => task.id !== taskId);
 
-    await chrome.storage.sync.set({
+    await chrome.storage.local.set({
       [StorageKey.TASKS]: filteredTasks
     });
 
@@ -102,7 +102,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
 
     if (taskIndex >= 0) {
       tasks[taskIndex] = { ...tasks[taskIndex], ...updates };
-      await chrome.storage.sync.set({
+      await chrome.storage.local.set({
         [StorageKey.TASKS]: tasks
       });
     } else {
@@ -208,7 +208,7 @@ export async function setCurrentTask(taskId?: string): Promise<void> {
  */
 export async function getTaskSettings(): Promise<TaskSettings> {
   try {
-    const result = await chrome.storage.sync.get(StorageKey.TASK_SETTINGS);
+    const result = await chrome.storage.local.get(StorageKey.TASK_SETTINGS);
     return { ...DEFAULT_TASK_SETTINGS, ...result[StorageKey.TASK_SETTINGS] };
   } catch (error) {
     console.error('タスク設定取得エラー:', error);
@@ -224,7 +224,7 @@ export async function saveTaskSettings(settings: Partial<TaskSettings>): Promise
     const currentSettings = await getTaskSettings();
     const newSettings = { ...currentSettings, ...settings };
 
-    await chrome.storage.sync.set({
+    await chrome.storage.local.set({
       [StorageKey.TASK_SETTINGS]: newSettings
     });
   } catch (error) {

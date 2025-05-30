@@ -10,8 +10,9 @@ export class PomodoroSlots {
 
   // イベントハンドラーをメンバ変数として保存
   private boundHandleDragOver: (event: DragEvent) => void;
-  private boundHandleDrop: (event: DragEvent) => Promise<void>;
   private boundHandleClick: (event: Event) => Promise<void>;
+  private boundHandleSlotDragStart: (event: DragEvent) => void;
+  private boundHandleSlotDrop: (event: DragEvent) => Promise<void>;
 
   constructor(container: HTMLElement, onSlotUpdate?: () => void) {
     this.container = container;
@@ -19,8 +20,9 @@ export class PomodoroSlots {
 
     // イベントハンドラーをバインド
     this.boundHandleDragOver = this.handleDragOver.bind(this);
-    this.boundHandleDrop = this.handleDrop.bind(this);
     this.boundHandleClick = this.handleClick.bind(this);
+    this.boundHandleSlotDragStart = this.handleSlotDragStart.bind(this);
+    this.boundHandleSlotDrop = this.handleSlotDrop.bind(this);
 
     this.init();
   }
@@ -121,8 +123,8 @@ export class PomodoroSlots {
         <div class="slot-actions">
           ${!slot.completed ? `
             <button class="slot-complete-btn" data-slot-id="${slot.id}" title="完了">
-              <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
               </svg>
             </button>
           ` : ''}
@@ -142,15 +144,16 @@ export class PomodoroSlots {
 
   private attachEventListeners() {
     // 既存のイベントリスナーを削除（重複を防ぐため）
+    this.container.removeEventListener('dragstart', this.boundHandleSlotDragStart);
     this.container.removeEventListener('dragover', this.boundHandleDragOver);
-    this.container.removeEventListener('drop', this.boundHandleDrop);
+    this.container.removeEventListener('drop', this.boundHandleSlotDrop);
     this.container.removeEventListener('click', this.boundHandleClick);
 
     // 新しいイベントリスナーを追加
     // ドラッグ&ドロップイベント
-    this.container.addEventListener('dragstart', this.handleSlotDragStart.bind(this));
+    this.container.addEventListener('dragstart', this.boundHandleSlotDragStart);
     this.container.addEventListener('dragover', this.boundHandleDragOver);
-    this.container.addEventListener('drop', this.handleSlotDrop.bind(this));
+    this.container.addEventListener('drop', this.boundHandleSlotDrop);
 
     // クリックイベント
     this.container.addEventListener('click', this.boundHandleClick);
@@ -159,41 +162,18 @@ export class PomodoroSlots {
   private handleDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'copy';
+      event.dataTransfer.dropEffect = 'move';
     }
 
-    // ドロップ可能な空のスロットをハイライト
-    const slot = (event.target as HTMLElement).closest('.slot');
-    if (slot && slot.classList.contains('slot-empty')) {
-      slot.classList.add('slot-dragover');
-    }
-
-    // 他のスロットのハイライトを削除
-    this.container.querySelectorAll('.slot-dragover').forEach(el => {
-      if (el !== slot) {
-        el.classList.remove('slot-dragover');
-      }
-    });
-  }
-
-  private async handleDrop(event: DragEvent) {
-    event.preventDefault();
-
-    // ハイライトを削除
+    // 現在のハイライトをクリア
     this.container.querySelectorAll('.slot-dragover').forEach(el => {
       el.classList.remove('slot-dragover');
     });
 
-    if (event.target instanceof HTMLElement && event.dataTransfer) {
-      const taskId = event.dataTransfer.getData('text/plain');
-      const slot = event.target.closest('.slot[data-droppable="true"]') as HTMLElement;
-
-      if (slot && taskId) {
-        const slotId = slot.dataset.slotId;
-        if (slotId && slot.classList.contains('slot-empty')) {
-          await this.assignTaskToSlot(slotId, taskId);
-        }
-      }
+    // ドロップ可能なスロットをハイライト
+    const slot = (event.target as HTMLElement).closest('.slot[data-droppable="true"]');
+    if (slot) {
+      slot.classList.add('slot-dragover');
     }
   }
 
@@ -424,68 +404,167 @@ export class PomodoroSlots {
   }
 
   private handleSlotDragStart(event: DragEvent) {
-    if (event.target instanceof HTMLElement && event.target.hasAttribute('draggable')) {
-      const taskId = event.target.dataset.taskId;
-      const slotId = event.target.dataset.slotId;
-      if (taskId && slotId && event.dataTransfer) {
-        event.dataTransfer.setData('text/plain', JSON.stringify({ taskId, slotId, source: 'slot' }));
-        event.dataTransfer.effectAllowed = 'move';
-        event.target.style.opacity = '0.5';
+    try {
+      // 既に処理中の場合は何もしない
+      if (this.isProcessing) {
+        console.log('Drag start already processing, skipping');
+        return;
       }
+
+      if (event.target instanceof HTMLElement && event.target.hasAttribute('draggable')) {
+        const taskId = event.target.dataset.taskId;
+        const slotId = event.target.dataset.slotId;
+
+        if (taskId && slotId && event.dataTransfer) {
+          this.isProcessing = true; // 処理開始フラグ
+
+          event.dataTransfer.setData('text/plain', JSON.stringify({ taskId, slotId, source: 'slot' }));
+          event.dataTransfer.effectAllowed = 'move';
+          event.target.style.opacity = '0.5';
+          event.target.classList.add('dragging');
+          console.log('Slot drag started:', { taskId, slotId });
+
+          // ドラッグ終了時にフラグをリセット
+          setTimeout(() => {
+            this.isProcessing = false;
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleSlotDragStart:', error);
+      this.isProcessing = false;
+      this.resetDragStyles();
     }
   }
 
   private async handleSlotDrop(event: DragEvent) {
     event.preventDefault();
 
+    try {
+      console.log('=== Slot drop event triggered ===');
+      console.log('Event target:', event.target);
+      console.log('DataTransfer available:', !!event.dataTransfer);
+
+      // 必ずスタイルをリセット
+      this.resetDragStyles();
+
+      if (event.target instanceof HTMLElement && event.dataTransfer) {
+        const dropData = event.dataTransfer.getData('text/plain');
+        console.log('Raw drop data:', `"${dropData}"`);
+        console.log('Drop data length:', dropData.length);
+
+        if (!dropData) {
+          console.log('No drop data available, exiting');
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(dropData);
+          console.log('Parsed drop data:', parsed);
+          const { taskId: _taskId, slotId, source } = parsed;
+
+          console.log('Extracted values:', { slotId, source });
+
+          if (source === 'slot') {
+            console.log('Processing slot-to-slot move');
+            // スロット間での並び替え
+            const targetSlot = event.target.closest('.slot[data-droppable="true"]') as HTMLElement;
+            console.log('Target slot element:', targetSlot);
+
+            if (targetSlot) {
+              const targetSlotId = targetSlot.dataset.slotId;
+              console.log('Target slot ID:', targetSlotId);
+              console.log('Source slot ID:', slotId);
+
+              if (targetSlotId && targetSlotId !== slotId) {
+                console.log('Initiating slot swap');
+                await this.reorderSlots(slotId, targetSlotId);
+                console.log('Slot swap completed successfully');
+              } else {
+                console.log('No swap needed - same slot or missing target ID');
+              }
+            } else {
+              console.log('No valid target slot found');
+            }
+          } else {
+            console.log('Processing kanban-to-slot move');
+            // カンバンからのドロップ処理
+            const targetSlot = event.target.closest('.slot[data-droppable="true"]') as HTMLElement;
+            if (targetSlot && targetSlot.classList.contains('slot-empty')) {
+              const targetSlotId = targetSlot.dataset.slotId;
+              if (targetSlotId) {
+                await this.assignTaskToSlot(targetSlotId, dropData); // dropDataがtaskId
+              }
+            }
+          }
+        } catch (parseError) {
+          console.log('JSON parsing failed:', parseError);
+          console.log('Processing as kanban-to-slot move');
+          // JSON parsing failed, treat as kanban task drop
+          const targetSlot = event.target.closest('.slot[data-droppable="true"]') as HTMLElement;
+          if (targetSlot && targetSlot.classList.contains('slot-empty')) {
+            const targetSlotId = targetSlot.dataset.slotId;
+            if (targetSlotId && dropData) {
+              await this.assignTaskToSlot(targetSlotId, dropData); // dropDataがtaskId
+            }
+          }
+        }
+      } else {
+        console.log('Invalid event target or no dataTransfer');
+      }
+    } catch (error) {
+      console.error('Error in handleSlotDrop:', error);
+      alert('スロットの移動に失敗しました。');
+    } finally {
+      // 確実にスタイルをリセット
+      this.resetDragStyles();
+      console.log('=== Slot drop processing completed ===');
+    }
+  }
+
+  private resetDragStyles() {
     // ハイライトを削除
     this.container.querySelectorAll('.slot-dragover').forEach(el => {
       el.classList.remove('slot-dragover');
     });
 
-    if (event.target instanceof HTMLElement && event.dataTransfer) {
-      const dropData = event.dataTransfer.getData('text/plain');
-
-      try {
-        const { taskId: _taskId, slotId, source } = JSON.parse(dropData);
-
-        if (source === 'slot') {
-          // スロット間での並び替え
-          const targetSlot = event.target.closest('.slot[data-droppable="true"]') as HTMLElement;
-          if (targetSlot) {
-            const targetSlotId = targetSlot.dataset.slotId;
-            if (targetSlotId && targetSlotId !== slotId) {
-              await this.reorderSlots(slotId, targetSlotId);
-            }
-          }
-        } else {
-          // 既存のカンバンからのドロップ処理
-          await this.handleDrop(event);
-        }
-      } catch (error) {
-        // JSON parsing failed, fall back to existing drop handler
-        await this.handleDrop(event);
-      }
-    }
-
-    // ドラッグ中の透明度をリセット
+    // ドラッグ中のスタイルをリセット
     this.container.querySelectorAll('[draggable="true"]').forEach(el => {
-      (el as HTMLElement).style.opacity = '1';
+      const element = el as HTMLElement;
+      element.style.opacity = '1';
+      element.classList.remove('dragging');
     });
   }
 
   private async reorderSlots(sourceSlotId: string, targetSlotId: string) {
     try {
+      console.log('Starting slot reorder:', { sourceSlotId, targetSlotId });
+
+      // ソースとターゲットが同じ場合は何もしない
+      if (sourceSlotId === targetSlotId) {
+        console.log('Source and target are the same, skipping');
+        return;
+      }
+
       const { swapSlotAssignments } = await import('../utils/storage');
       await swapSlotAssignments(sourceSlotId, targetSlotId);
 
+      console.log('Storage swap completed, refreshing UI');
       await this.refreshSilent();
 
       if (this.onSlotUpdate) {
         this.onSlotUpdate();
       }
+
+      console.log('Slot reorder completed successfully');
     } catch (error) {
       console.error('スロットの並び替えに失敗しました:', error);
+      console.error('Error details:', {
+        sourceSlotId,
+        targetSlotId,
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      });
       alert('スロットの並び替えに失敗しました。');
     }
   }

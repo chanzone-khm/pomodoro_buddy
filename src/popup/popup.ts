@@ -1,4 +1,4 @@
-import { MessageAction, SessionType, Task, TaskStatus, TimerSettings, TimerState } from '../types/index.js';
+import { MessageAction, SessionType, Task, TimerSettings, TimerState } from '../types/index.js';
 import { playSessionCompleteSound } from '../utils/audio.js';
 import {
     calculateCycleState,
@@ -23,18 +23,10 @@ import {
     type ProgressBarState
 } from '../utils/progress.js';
 import {
-    completeTask,
     createTask,
-    deleteTask,
     getAllTasks,
     getCurrentTask,
-    getTaskSettings,
-    getTaskStatistics,
-    saveTask,
-    saveTaskSettings,
-    setCurrentTask,
-    startTask,
-    updateTask
+    saveTask
 } from '../utils/tasks.js';
 import {
     calculateTimeStats,
@@ -61,6 +53,11 @@ const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 const currentTaskName = document.getElementById('current-task-name') as HTMLElement;
 const noTaskMessage = document.getElementById('no-task-message') as HTMLElement;
 
+// 次プラン表示関連のエレメント
+const nextPlanSection = document.getElementById('next-plan-section') as HTMLElement;
+const nextPlanTask = document.getElementById('next-plan-task') as HTMLElement;
+const nextPlanInfo = document.getElementById('next-plan-info') as HTMLElement;
+
 // 設定関連のエレメント
 const settingsToggle = document.getElementById('settings-toggle') as HTMLButtonElement;
 const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
@@ -68,23 +65,8 @@ const soundEnabledCheckbox = document.getElementById('sound-enabled') as HTMLInp
 const testWorkSoundBtn = document.getElementById('test-work-sound') as HTMLButtonElement;
 const testBreakSoundBtn = document.getElementById('test-break-sound') as HTMLButtonElement;
 
-// タスク管理関連のエレメント
-const addTaskBtn = document.getElementById('add-task-btn') as HTMLButtonElement;
+// タスク管理関連のエレメント（カンバンボタンのみ残す）
 const openTaskManagerBtn = document.getElementById('open-task-manager-btn') as HTMLButtonElement;
-const currentTaskSelect = document.getElementById('current-task-select') as HTMLSelectElement;
-const taskList = document.getElementById('task-list') as HTMLElement;
-const taskStats = document.getElementById('task-stats') as HTMLElement;
-const showTaskInPopupCheckbox = document.getElementById('show-task-in-popup') as HTMLInputElement;
-
-// タスクモーダル関連のエレメント
-const taskModal = document.getElementById('task-modal') as HTMLElement;
-const taskModalTitle = document.getElementById('task-modal-title') as HTMLElement;
-const closeTaskModalBtn = document.getElementById('close-task-modal') as HTMLButtonElement;
-const taskForm = document.getElementById('task-form') as HTMLFormElement;
-const taskNameInput = document.getElementById('task-name-input') as HTMLInputElement;
-const taskDescriptionInput = document.getElementById('task-description-input') as HTMLTextAreaElement;
-const estimatedPomodorosInput = document.getElementById('estimated-pomodoros-input') as HTMLSelectElement;
-const cancelTaskBtn = document.getElementById('cancel-task-btn') as HTMLButtonElement;
 
 // プログレスバー関連のエレメント
 const progressBarContainer = document.getElementById('progress-bar-container') as HTMLElement;
@@ -103,6 +85,11 @@ const workDurationSelect = document.getElementById('work-duration') as HTMLSelec
 const shortBreakDurationSelect = document.getElementById('short-break-duration') as HTMLSelectElement;
 const longBreakDurationSelect = document.getElementById('long-break-duration') as HTMLSelectElement;
 const timeStatsDiv = document.getElementById('time-stats') as HTMLElement;
+
+// プラン一覧関連のエレメント
+const todayPlanSection = document.getElementById('today-plan-section') as HTMLElement;
+const planProgress = document.getElementById('plan-progress') as HTMLElement;
+const planList = document.getElementById('plan-list') as HTMLElement;
 
 // タイマーの状態
 let timerState: TimerState | null = null;
@@ -126,6 +113,11 @@ let currentTask: Task | null = null;
 let allTasks: Task[] = [];
 let editingTaskId: string | null = null;
 
+// プラン管理の状態
+let dayPlan: any = null;
+let currentSlot: any = null;
+let nextSlot: any = null;
+
 /**
  * 初期化
  */
@@ -145,6 +137,27 @@ async function initialize() {
   // タスク管理の初期化
   await initializeTasks();
 
+  // カンバンからの変更通知を受信
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.action === 'TASK_UPDATED' || message.action === 'PLAN_UPDATED') {
+      console.log('📩 カンバンからの変更通知を受信:', message.action);
+      handleExternalUpdate();
+    }
+  });
+
+  // ストレージの変更も監視（カンバンからの直接変更を検出）
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    console.log('💾 ポップアップでストレージ変更を検出:', changes, areaName);
+
+    // プランやタスクの変更を検出（他のタブ/ウィンドウからの変更）
+    if ((changes.day_plans || changes.tasks) && areaName === 'local') {
+      console.log('🔄 重要な変更を検出 - ポップアップを更新');
+      setTimeout(() => {
+        handleExternalUpdate();
+      }, 200);
+    }
+  });
+
   // イベントリスナーを設定
   startBtn.addEventListener('click', handleStartClick);
   pauseBtn.addEventListener('click', handlePauseClick);
@@ -157,18 +170,7 @@ async function initialize() {
   testBreakSoundBtn.addEventListener('click', () => handleTestSound(SessionType.Break));
 
   // タスク管理関連のイベントリスナー
-  addTaskBtn.addEventListener('click', handleAddTaskClick);
   openTaskManagerBtn.addEventListener('click', handleOpenTaskManagerClick);
-  currentTaskSelect.addEventListener('change', handleCurrentTaskChange);
-  showTaskInPopupCheckbox.addEventListener('change', handleShowTaskInPopupChange);
-
-  // タスクモーダル関連のイベントリスナー
-  closeTaskModalBtn.addEventListener('click', closeTaskModal);
-  cancelTaskBtn.addEventListener('click', closeTaskModal);
-  taskForm.addEventListener('submit', handleTaskFormSubmit);
-  taskModal.addEventListener('click', (e) => {
-    if (e.target === taskModal) closeTaskModal();
-  });
 
   // プログレスバー関連のイベントリスナー
   progressEnabledCheckbox.addEventListener('change', handleProgressEnabledChange);
@@ -258,6 +260,9 @@ function updateDisplay() {
 
   // プログレスバーを更新
   updateProgressBar();
+
+  // 次プラン表示を更新
+  updateNextPlanDisplay();
 }
 
 /**
@@ -690,357 +695,726 @@ async function handleLongBreakDurationChange() {
  * タスク管理の初期化
  */
 async function initializeTasks() {
+  console.log('🔄 タスク管理初期化開始');
+
   // 現在のタスクを取得
   currentTask = await getCurrentTask();
+  console.log('📋 現在のタスク:', { currentTask: currentTask?.name || 'なし' });
 
-  // 全タスクを取得
+  // 全タスクを取得（複数回試行して確実に取得）
   allTasks = await getAllTasks();
+  console.log('📋 全タスク取得（1回目）:', { count: allTasks.length, tasks: allTasks.map(t => ({ id: t.id, name: t.name, status: t.status })) });
 
-  // タスク設定を読み込み
-  const taskSettings = await getTaskSettings();
-  showTaskInPopupCheckbox.checked = taskSettings.showTaskInPopup;
+  // タスクが取得できていない場合は少し待ってリトライ
+  if (allTasks.length === 0) {
+    console.log('⏳ タスクが見つからないため、少し待ってリトライします...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    allTasks = await getAllTasks();
+    console.log('📋 全タスク取得（2回目）:', { count: allTasks.length, tasks: allTasks.map(t => ({ id: t.id, name: t.name, status: t.status })) });
+  }
+
+  // プラン情報を初期化（タスクデータ取得後）
+  await initializePlan();
 
   // 表示を更新
   await updateCurrentTaskDisplay();
-  updateTaskList();
-  updateTaskSelect();
-  updateTaskStats();
+  updatePlanDisplay();
+
+  console.log('✅ タスク管理初期化完了');
+}
+
+/**
+ * プラン情報の初期化
+ */
+async function initializePlan() {
+  try {
+    console.log('🔄 プラン初期化開始');
+    console.log('📋 initializePlan開始時のallTasks:', { count: allTasks.length, taskIds: allTasks.map(t => t.id) });
+
+    const { getTodayDayPlan } = await import('../utils/storage.js');
+    dayPlan = await getTodayDayPlan();
+    console.log('📅 取得したプラン:', dayPlan);
+
+    // データ整合性チェック
+    console.log('🔍 validatePlanData実行直前のallTasks:', { count: allTasks.length, taskIds: allTasks.map(t => t.id) });
+    await validatePlanData();
+    console.log('🔍 validatePlanData実行直後のdayPlan:', {
+      slots: dayPlan?.slots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed }))
+    });
+
+    await updateCurrentSlot();
+    console.log('✅ プラン初期化完了');
+  } catch (error) {
+    console.error('❌ プラン初期化に失敗しました:', error);
+    dayPlan = null;
+    currentSlot = null;
+    nextSlot = null;
+  }
+}
+
+/**
+ * プランデータの整合性をチェックし、存在しないタスクIDを参照するスロットをクリア
+ */
+async function validatePlanData() {
+  if (!dayPlan || !dayPlan.slots) {
+    console.log('📊 プランデータなし - 整合性チェックスキップ');
+    return;
+  }
+
+  console.log('🔍 プランデータ整合性チェック開始');
+  console.log('📊 チェック対象プラン:', {
+    date: dayPlan.date,
+    slotsWithTasks: dayPlan.slots.filter((s: any) => s.taskId).map((s: any) => ({ id: s.id, taskId: s.taskId }))
+  });
+
+  // 現在のタスクIDリストを取得
+  const existingTaskIds = allTasks.map(t => t.id);
+  console.log('📋 存在するタスクID:', existingTaskIds);
+  console.log('📋 存在するタスク詳細:', allTasks.map(t => ({ id: t.id, name: t.name, status: t.status })));
+
+  // 無効なタスクIDを参照するスロットを特定
+  const slotsWithTasks = dayPlan.slots.filter((slot: any) => slot.taskId);
+  console.log('📊 タスクIDが設定されているスロット:', slotsWithTasks.map((s: any) => ({ id: s.id, taskId: s.taskId })));
+
+  const invalidSlots = dayPlan.slots.filter((slot: any) =>
+    slot.taskId && !existingTaskIds.includes(slot.taskId)
+  );
+
+  if (invalidSlots.length > 0) {
+    console.log('⚠️ 無効なスロット発見（Storage API統一のため一時的にクリアを無効化）:', invalidSlots.map((s: any) => ({ id: s.id, taskId: s.taskId })));
+    console.log('⚠️ 無効な理由の詳細確認:');
+    invalidSlots.forEach((slot: any) => {
+      const exists = existingTaskIds.includes(slot.taskId);
+      console.log(`  - スロット ${slot.id} のタスクID ${slot.taskId}: 存在する=${exists}`);
+    });
+
+    // 一時的にクリア処理を無効化
+    console.log('🚫 プランデータクリア処理を一時的に無効化しました');
+  } else {
+    console.log('✅ プランデータ整合性OK - クリアするスロットなし');
+  }
+}
+
+/**
+ * 現在のスロット情報を更新
+ */
+async function updateCurrentSlot() {
+  console.log('🔄 現在スロット更新開始', { dayPlan });
+
+  if (!dayPlan) {
+    console.log('❌ プランなし - スロットクリア');
+    currentSlot = null;
+    nextSlot = null;
+    return;
+  }
+
+  // プランの順序通りに、未完了の最初のスロットを現在のスロットとする
+  const allSlots = dayPlan.slots || [];
+  const uncompletedSlots = allSlots.filter((slot: any) => slot.taskId && !slot.completed);
+
+  // プランの順序に基づいて並び替え（スロットIDは順序を保持している前提）
+  uncompletedSlots.sort((a: any, b: any) => {
+    const aIndex = allSlots.findIndex((s: any) => s.id === a.id);
+    const bIndex = allSlots.findIndex((s: any) => s.id === b.id);
+    return aIndex - bIndex;
+  });
+
+  currentSlot = uncompletedSlots[0] || null;
+
+  // 次のスロットを取得（プランの順序で次に実行すべきスロット）
+  if (uncompletedSlots.length > 1) {
+    nextSlot = uncompletedSlots[1];
+  } else {
+    nextSlot = null;
+  }
+
+  console.log('📋 スロット情報更新:', {
+    currentSlot: currentSlot ? { id: currentSlot.id, taskId: currentSlot.taskId } : null,
+    nextSlot: nextSlot ? { id: nextSlot.id, taskId: nextSlot.taskId } : null,
+    uncompletedCount: uncompletedSlots.length,
+    totalSlots: allSlots.length
+  });
+
+  // プラン表示も更新
+  updatePlanDisplay();
 }
 
 /**
  * 現在のタスク表示を更新
  */
 async function updateCurrentTaskDisplay() {
-  const taskSettings = await getTaskSettings();
+  // プランタスクを優先的に表示
+  let displayTask = null;
+  let displayText = '';
 
-  if (currentTask && taskSettings.showTaskInPopup) {
-    currentTaskName.textContent = currentTask.name;
+  if (currentSlot) {
+    // プランのタスクが存在する場合
+    const planTask = allTasks.find(t => t.id === currentSlot!.taskId);
+    if (planTask) {
+      displayTask = planTask;
+
+      // プラン内での進捗を表示
+      const taskSlots = dayPlan?.slots.filter((s: any) => s.taskId === planTask.id) || [];
+      const currentSlotIndex = taskSlots.findIndex((s: any) => s.id === currentSlot!.id) + 1;
+      const totalSlots = taskSlots.length;
+
+      displayText = `🍅 ${planTask.name} (${currentSlotIndex}/${totalSlots})`;
+    }
+  } else if (currentTask) {
+    // フリーモードのタスク
+    displayTask = currentTask;
+    displayText = `📝 ${currentTask.name}`;
+  }
+
+  // 常にタスクを表示（showTaskInPopup設定は削除）
+  if (displayTask) {
+    currentTaskName.textContent = displayText;
     currentTaskName.classList.remove('hidden');
     noTaskMessage.classList.add('hidden');
   } else {
     currentTaskName.classList.add('hidden');
     noTaskMessage.classList.remove('hidden');
   }
+
+  // 次プラン表示も更新
+  updateNextPlanDisplay();
 }
 
 /**
- * タスクリストを更新
+ * プラン表示を更新する
  */
-function updateTaskList() {
-  taskList.innerHTML = '';
+function updatePlanDisplay() {
+  console.log('🔄 プラン表示更新開始', { dayPlan, hasSlots: dayPlan?.slots?.length });
 
-  // 進行中のタスクを最初に表示
-  const inProgressTasks = allTasks.filter(task => task.status === TaskStatus.Doing);
-  const pendingTasks = allTasks.filter(task => task.status === TaskStatus.Backlog);
-  const completedTasks = allTasks.filter(task => task.status === TaskStatus.Done).slice(0, 3); // 最新3件のみ
-
-  const tasksToShow = [...inProgressTasks, ...pendingTasks, ...completedTasks];
-
-  if (tasksToShow.length === 0) {
-    const emptyMessage = document.createElement('div');
-    emptyMessage.className = 'text-xs text-gray-400 text-center py-2';
-    emptyMessage.textContent = 'タスクがありません';
-    taskList.appendChild(emptyMessage);
+  if (!dayPlan || !dayPlan.slots || dayPlan.slots.length === 0) {
+    console.log('❌ プランなし - 非表示');
+    todayPlanSection.classList.add('hidden');
     return;
   }
 
-  tasksToShow.forEach(task => {
-    const taskItem = createTaskItem(task);
-    taskList.appendChild(taskItem);
+  // プランが存在する場合は表示
+  console.log('✅ プランあり - 表示');
+  todayPlanSection.classList.remove('hidden');
+
+  // 進捗を計算
+  const assignedSlots = dayPlan.slots.filter((slot: any) => slot.taskId);
+  const completedSlots = assignedSlots.filter((slot: any) => slot.completed);
+
+  console.log('📊 プラン進捗:', {
+    totalSlots: dayPlan.slots.length,
+    assignedSlots: assignedSlots.length,
+    completedSlots: completedSlots.length
   });
+
+  // 進捗表示を更新
+  planProgress.textContent = `${completedSlots.length}/${assignedSlots.length}`;
+
+  // プラン一覧を描画
+  renderPlanList();
+
+  // 次プラン表示も更新
+  updateNextPlanDisplay();
 }
 
 /**
- * タスクアイテムのHTML要素を作成
+ * 次プラン表示を更新する
  */
-function createTaskItem(task: Task): HTMLElement {
-  const taskItem = document.createElement('div');
-  taskItem.className = `task-item task-${task.status}`;
-
-  const taskInfo = document.createElement('div');
-  taskInfo.className = 'flex-1 min-w-0';
-
-  const taskName = document.createElement('div');
-  taskName.className = 'task-name';
-  taskName.textContent = task.name;
-  taskName.title = task.description || task.name;
-
-  const taskMeta = document.createElement('div');
-  taskMeta.className = 'flex items-center gap-2 mt-1';
-
-  const statusBadge = document.createElement('span');
-  statusBadge.className = `task-status-badge task-status-${task.status}`;
-  statusBadge.textContent = getStatusText(task.status);
-
-  const pomodoroCount = document.createElement('span');
-  pomodoroCount.className = 'task-pomodoro-count';
-  pomodoroCount.textContent = `🍅 ${task.actualPomodoros}`;
-  if (task.estimatePomodoros) {
-    pomodoroCount.textContent += `/${task.estimatePomodoros}`;
+function updateNextPlanDisplay() {
+  // セッション状態を確認（休憩中で次のスロットがある場合のみ表示）
+  if (!timerState || timerState.type !== 'break' || !nextSlot) {
+    nextPlanSection.classList.add('hidden');
+    return;
   }
 
-  taskMeta.appendChild(statusBadge);
-  taskMeta.appendChild(pomodoroCount);
-
-  taskInfo.appendChild(taskName);
-  taskInfo.appendChild(taskMeta);
-
-  const taskActions = document.createElement('div');
-  taskActions.className = 'task-actions';
-
-  // アクションボタンを作成
-  if (task.status === TaskStatus.Backlog) {
-    const startBtn = createTaskActionButton('▶', 'start', () => handleTaskStart(task.id));
-    taskActions.appendChild(startBtn);
-  } else if (task.status === TaskStatus.Doing) {
-    const completeBtn = createTaskActionButton('✓', 'complete', () => handleTaskComplete(task.id));
-    taskActions.appendChild(completeBtn);
+  // 次のタスクを取得
+  const nextTask = allTasks.find(t => t.id === nextSlot.taskId);
+  if (!nextTask) {
+    nextPlanSection.classList.add('hidden');
+    return;
   }
 
-  const editBtn = createTaskActionButton('✏', 'edit', () => handleTaskEdit(task.id));
-  const deleteBtn = createTaskActionButton('🗑', 'delete', () => handleTaskDelete(task.id));
+  // 次プラン表示を更新
+  nextPlanSection.classList.remove('hidden');
+  nextPlanTask.textContent = nextTask.name;
 
-  taskActions.appendChild(editBtn);
-  taskActions.appendChild(deleteBtn);
+  // 追加情報（ポモドーロ数など）
+  const taskSlots = dayPlan?.slots.filter((s: any) => s.taskId === nextTask.id) || [];
+  const completedCount = taskSlots.filter((s: any) => s.completed).length;
+  const totalCount = taskSlots.length;
 
-  taskItem.appendChild(taskInfo);
-  taskItem.appendChild(taskActions);
-
-  return taskItem;
+  nextPlanInfo.textContent = `ポモドーロ ${completedCount + 1}/${totalCount}`;
 }
 
 /**
- * タスクアクションボタンを作成
+ * プラン一覧を描画する
  */
-function createTaskActionButton(text: string, className: string, onClick: () => void): HTMLElement {
-  const button = document.createElement('button');
-  button.className = `task-action-btn ${className}`;
-  button.textContent = text;
-  button.addEventListener('click', onClick);
-  return button;
-}
+function renderPlanList() {
+  console.log('🔄 プラン一覧描画開始', { dayPlan, allTasks: allTasks?.length });
 
-/**
- * タスクステータスのテキストを取得
- */
-function getStatusText(status: TaskStatus): string {
-  switch (status) {
-    case TaskStatus.Backlog:
-      return '待機中';
-    case TaskStatus.Doing:
-      return '進行中';
-    case TaskStatus.Done:
-      return '完了';
-    default:
-      return '不明';
+  if (!dayPlan) {
+    console.log('❌ dayPlanがnull');
+    return;
   }
-}
 
-/**
- * タスク選択セレクトボックスを更新
- */
-function updateTaskSelect() {
-  currentTaskSelect.innerHTML = '<option value="">タスクを選択...</option>';
+  planList.innerHTML = '';
 
-  const availableTasks = allTasks.filter(task =>
-    task.status === TaskStatus.Backlog || task.status === TaskStatus.Doing
-  );
+  // スロットが割り当てられているもののみ表示
+  const assignedSlots = dayPlan.slots.filter((slot: any) => slot.taskId);
 
-  availableTasks.forEach(task => {
-    const option = document.createElement('option');
-    option.value = task.id;
-    option.textContent = task.name;
-    if (currentTask && currentTask.id === task.id) {
-      option.selected = true;
+  console.log('📊 スロット詳細:', {
+    totalSlots: dayPlan.slots.length,
+    assignedSlots: assignedSlots.length,
+    slotsData: dayPlan.slots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed })),
+    assignedSlotsData: assignedSlots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed }))
+  });
+
+  // DEBUG: プランデータの詳細ログ
+  console.log('🔍 プランデータ詳細確認:', {
+    dayPlanExists: !!dayPlan,
+    slotsExists: !!dayPlan.slots,
+    slotsLength: dayPlan.slots?.length,
+    rawSlots: dayPlan.slots,
+    assignedSlotsLength: assignedSlots.length,
+    allTasksLength: allTasks.length,
+    allTasksData: allTasks
+  });
+
+  if (assignedSlots.length === 0) {
+    console.log('❌ 割り当て済みスロットなし - 空メッセージ表示');
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'plan-empty';
+    emptyMessage.textContent = 'プランが設定されていません';
+    planList.appendChild(emptyMessage);
+    return;
+  }
+
+  // タスクごとにグループ化（プランの順序を保持）
+  const taskGroups = new Map();
+  const taskOrder: string[] = [];
+
+  assignedSlots.forEach((slot: any) => {
+    if (!taskGroups.has(slot.taskId)) {
+      taskGroups.set(slot.taskId, []);
+      taskOrder.push(slot.taskId);
     }
-    currentTaskSelect.appendChild(option);
+    taskGroups.get(slot.taskId).push(slot);
   });
+
+  console.log('📋 タスクグループ:', {
+    groupCount: taskGroups.size,
+    taskOrder: taskOrder,
+    allTasksIds: allTasks?.map(t => t.id) || []
+  });
+
+  // プランの順序でタスクグループを描画
+  taskOrder.forEach((taskId: string) => {
+    const slots = taskGroups.get(taskId);
+    const task = allTasks.find(t => t.id === taskId);
+
+    console.log('🔍 タスク検索:', { taskId, found: !!task, taskName: task?.name });
+
+    if (!task) {
+      console.log('❌ タスクが見つからない:', taskId);
+      return;
+    }
+
+    const completedCount = slots.filter((s: any) => s.completed).length;
+    const totalCount = slots.length;
+    const isCurrentTask = currentSlot && slots.some((s: any) => s.id === currentSlot.id);
+
+    const planItem = createPlanItem(task, completedCount, totalCount, isCurrentTask);
+    planList.appendChild(planItem);
+
+    console.log('✅ プランアイテム追加:', { taskName: task.name, completedCount, totalCount, isCurrentTask });
+  });
+
+  console.log('✅ プラン一覧描画完了');
 }
 
 /**
- * タスク統計を更新
+ * プランアイテムを作成する
  */
-async function updateTaskStats() {
-  const stats = await getTaskStatistics();
+function createPlanItem(task: any, completedCount: number, totalCount: number, isCurrent: boolean): HTMLElement {
+  const planItem = document.createElement('div');
+  planItem.className = `plan-item ${isCurrent ? 'current' : ''} ${completedCount === totalCount ? 'completed' : ''}`;
+  planItem.setAttribute('data-task-id', task.id);
+  planItem.setAttribute('draggable', 'true');
 
-  taskStats.innerHTML = `
-    <div class="flex justify-between text-xs">
-      <span>総タスク: ${stats.total}</span>
-      <span>完了: ${stats.completed}</span>
-      <span>🍅: ${stats.totalPomodoros}</span>
-    </div>
-  `;
+  // ドラッグ&ドロップイベント
+  planItem.addEventListener('dragstart', handlePlanDragStart);
+  planItem.addEventListener('dragover', handlePlanDragOver);
+  planItem.addEventListener('drop', handlePlanDrop);
+  planItem.addEventListener('dragend', handlePlanDragEnd);
+
+  // ステータスアイコン
+  const status = document.createElement('div');
+  status.className = `plan-item-status ${
+    completedCount === totalCount ? 'completed' : isCurrent ? 'current' : 'pending'
+  }`;
+
+  if (completedCount === totalCount) {
+    status.textContent = '✓';
+  } else if (isCurrent) {
+    status.textContent = '▶';
+  } else {
+    status.textContent = (completedCount + 1).toString();
+  }
+
+  // タスク名
+  const name = document.createElement('div');
+  name.className = 'plan-item-name';
+  name.textContent = task.name;
+  name.title = task.name; // ツールチップ
+
+  // 進捗表示
+  const progress = document.createElement('div');
+  progress.className = 'plan-item-progress';
+  progress.textContent = `${completedCount}/${totalCount}`;
+
+  // アクションボタン（現在のタスクで未完了の場合のみ）
+  let actions = null;
+  if (isCurrent && completedCount < totalCount) {
+    actions = document.createElement('div');
+    actions.className = 'plan-item-actions';
+
+    const completeBtn = document.createElement('button');
+    completeBtn.className = 'plan-complete-btn';
+    completeBtn.title = '完了';
+    completeBtn.innerHTML = `
+      <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+      </svg>
+    `;
+    completeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handlePlanItemComplete(task.id);
+    });
+
+    actions.appendChild(completeBtn);
+  }
+
+  planItem.appendChild(status);
+  planItem.appendChild(name);
+  planItem.appendChild(progress);
+  if (actions) {
+    planItem.appendChild(actions);
+  }
+
+  return planItem;
 }
 
 /**
- * タスク追加ボタンのクリックハンドラー
+ * プランアイテムの完了処理
  */
-function handleAddTaskClick() {
-  editingTaskId = null;
-  taskModalTitle.textContent = '新しいタスク';
-  taskNameInput.value = '';
-  taskDescriptionInput.value = '';
-  estimatedPomodorosInput.value = '';
-  openTaskModal();
-}
+async function handlePlanItemComplete(taskId: string) {
+  if (!currentSlot || currentSlot.taskId !== taskId) {
+    console.error('現在のスロットと一致しないタスクです');
+    return;
+  }
 
-/**
- * 現在のタスク選択の変更ハンドラー
- */
-async function handleCurrentTaskChange() {
-  const selectedTaskId = currentTaskSelect.value;
+  try {
+    console.log('🎯 プランアイテム完了処理開始:', { taskId, slotId: currentSlot.id });
 
-  if (selectedTaskId) {
-    await setCurrentTask(selectedTaskId);
+    // 現在のスロットを完了状態にする
+    const { completePomodoro, updateTask } = await import('../utils/storage.js');
+    await completePomodoro(currentSlot.id);
+    console.log('✅ ポモドーロ完了マーク完了');
+
+    // タスクの実績ポモドーロ数を更新
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      await updateTask(taskId, {
+        actualPomodoros: task.actualPomodoros + 1
+      });
+      console.log('✅ タスクの実績ポモドーロ数更新完了');
+    }
+
+    // 即座にカンバンに変更を通知（複数回送信で確実性を向上）
+    console.log('📤 カンバンに完了通知送信中...');
+    const notificationMessage = {
+      action: 'PLAN_UPDATED',
+      data: {
+        completed: true,
+        taskId: taskId,
+        slotId: currentSlot.id,
+        timestamp: Date.now()
+      }
+    };
+
+    // 即座に送信
+    chrome.runtime.sendMessage(notificationMessage);
+
+    // 少し遅延してから再送信（確実性のため）
+    setTimeout(() => {
+      chrome.runtime.sendMessage(notificationMessage);
+      console.log('📤 カンバンに再送信完了');
+    }, 50);
+
+    // プラン情報を再読み込み
+    await initializePlan();
+
+    // タスク情報も再読み込み
+    allTasks = await getAllTasks();
     currentTask = await getCurrentTask();
 
-    // 選択したタスクを進行中にする
-    if (currentTask && currentTask.status === TaskStatus.Backlog) {
-      await startTask(selectedTaskId);
-      allTasks = await getAllTasks();
-      updateTaskList();
-    }
-  } else {
-    await setCurrentTask(undefined);
-    currentTask = null;
-  }
-
-  await updateCurrentTaskDisplay();
-}
-
-/**
- * ポップアップにタスク名表示設定の変更ハンドラー
- */
-async function handleShowTaskInPopupChange() {
-  await saveTaskSettings({
-    showTaskInPopup: showTaskInPopupCheckbox.checked
-  });
-
-  await updateCurrentTaskDisplay();
-}
-
-/**
- * タスクモーダルを開く
- */
-function openTaskModal() {
-  taskModal.classList.remove('hidden');
-  taskNameInput.focus();
-}
-
-/**
- * タスクモーダルを閉じる
- */
-function closeTaskModal() {
-  taskModal.classList.add('hidden');
-  editingTaskId = null;
-}
-
-/**
- * タスクフォームの送信ハンドラー
- */
-async function handleTaskFormSubmit(e: Event) {
-  e.preventDefault();
-
-  const name = taskNameInput.value.trim();
-  if (!name) return;
-
-  const description = taskDescriptionInput.value.trim() || undefined;
-  const estimatePomodoros = estimatedPomodorosInput.value ?
-    parseInt(estimatedPomodorosInput.value) : undefined;
-
-  if (editingTaskId) {
-    // 既存タスクの編集
-    await updateTask(editingTaskId, {
-      name,
-      description,
-      estimatePomodoros
-    });
-  } else {
-    // 新しいタスクの作成
-    const newTask = createTask(name, description, estimatePomodoros);
-    await saveTask(newTask);
-  }
-
-  // データを再読み込みして表示を更新
-  allTasks = await getAllTasks();
-  updateTaskList();
-  updateTaskSelect();
-  updateTaskStats();
-
-  closeTaskModal();
-}
-
-/**
- * タスク開始ハンドラー
- */
-async function handleTaskStart(taskId: string) {
-  await startTask(taskId);
-  await setCurrentTask(taskId);
-
-  currentTask = await getCurrentTask();
-  allTasks = await getAllTasks();
-
-  await updateCurrentTaskDisplay();
-  updateTaskList();
-  updateTaskSelect();
-}
-
-/**
- * タスク完了ハンドラー
- */
-async function handleTaskComplete(taskId: string) {
-  await completeTask(taskId);
-
-  // 現在のタスクが完了した場合はクリア
-  if (currentTask && currentTask.id === taskId) {
-    currentTask = null;
-  }
-
-  allTasks = await getAllTasks();
-
-  await updateCurrentTaskDisplay();
-  updateTaskList();
-  updateTaskSelect();
-  updateTaskStats();
-}
-
-/**
- * タスク編集ハンドラー
- */
-async function handleTaskEdit(taskId: string) {
-  const task = allTasks.find(t => t.id === taskId);
-  if (!task) return;
-
-  editingTaskId = taskId;
-  taskModalTitle.textContent = 'タスクを編集';
-  taskNameInput.value = task.name;
-  taskDescriptionInput.value = task.description || '';
-  estimatedPomodorosInput.value = task.estimatePomodoros?.toString() || '';
-
-  openTaskModal();
-}
-
-/**
- * タスク削除ハンドラー
- */
-async function handleTaskDelete(taskId: string) {
-  const task = allTasks.find(t => t.id === taskId);
-  if (!task) return;
-
-  if (confirm(`タスク「${task.name}」を削除しますか？`)) {
-    await deleteTask(taskId);
-
-    // 現在のタスクが削除された場合はクリア
-    if (currentTask && currentTask.id === taskId) {
-      currentTask = null;
-    }
-
-    allTasks = await getAllTasks();
-
+    // 表示を更新
     await updateCurrentTaskDisplay();
-    updateTaskList();
-    updateTaskSelect();
-    updateTaskStats();
+    updatePlanDisplay();
+
+    console.log('✅ プランアイテム完了処理完了');
+
+  } catch (error) {
+    console.error('❌ プラン完了処理に失敗しました:', error);
+  }
+}
+
+/**
+ * プランアイテムのドラッグ開始処理
+ */
+function handlePlanDragStart(event: DragEvent) {
+  const target = event.target as HTMLElement;
+  const taskId = target.getAttribute('data-task-id');
+
+  if (taskId && event.dataTransfer) {
+    event.dataTransfer.setData('text/plain', taskId);
+    event.dataTransfer.effectAllowed = 'move';
+    target.style.opacity = '0.5';
+    target.classList.add('dragging');
+  }
+}
+
+/**
+ * プランアイテムのドラッグオーバー処理
+ */
+function handlePlanDragOver(event: DragEvent) {
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  const target = event.target as HTMLElement;
+  const planItem = target.closest('.plan-item') as HTMLElement;
+  if (planItem && !planItem.classList.contains('dragging')) {
+    planItem.classList.add('drag-over');
+  }
+}
+
+/**
+ * プランアイテムのドロップ処理
+ */
+async function handlePlanDrop(event: DragEvent) {
+  event.preventDefault();
+
+  const target = event.target as HTMLElement;
+  const dropTarget = target.closest('.plan-item') as HTMLElement;
+  const draggedTaskId = event.dataTransfer?.getData('text/plain');
+  const targetTaskId = dropTarget?.getAttribute('data-task-id');
+
+  if (draggedTaskId && targetTaskId && draggedTaskId !== targetTaskId) {
+    try {
+      await reorderPlanTasks(draggedTaskId, targetTaskId);
+    } catch (error) {
+      console.error('プラン並び替えに失敗しました:', error);
+    }
+  }
+
+  // スタイルをクリア
+  document.querySelectorAll('.plan-item').forEach(item => {
+    item.classList.remove('drag-over');
+  });
+}
+
+/**
+ * プランアイテムのドラッグ終了処理
+ */
+function handlePlanDragEnd(event: DragEvent) {
+  const target = event.target as HTMLElement;
+  target.style.opacity = '1';
+  target.classList.remove('dragging');
+
+  // 全ての drag-over クラスを削除
+  document.querySelectorAll('.plan-item').forEach(item => {
+    item.classList.remove('drag-over');
+  });
+}
+
+/**
+ * プランタスクの順序を変更する
+ */
+async function reorderPlanTasks(draggedTaskId: string, targetTaskId: string) {
+  if (!dayPlan) return;
+
+  try {
+    console.log('🔄 プランタスク並び替え開始:', { draggedTaskId, targetTaskId });
+
+    // ドラッグされたタスクのスロットを取得
+    const draggedSlots = dayPlan.slots.filter((slot: any) => slot.taskId === draggedTaskId);
+    const targetSlots = dayPlan.slots.filter((slot: any) => slot.taskId === targetTaskId);
+
+    if (draggedSlots.length === 0 || targetSlots.length === 0) return;
+
+    // 最初のスロットの位置を基準に並び替え
+    const draggedFirstSlotIndex = dayPlan.slots.findIndex((slot: any) => slot.id === draggedSlots[0].id);
+    const targetFirstSlotIndex = dayPlan.slots.findIndex((slot: any) => slot.id === targetSlots[0].id);
+
+    if (draggedFirstSlotIndex === -1 || targetFirstSlotIndex === -1) return;
+
+    // スロットを移動
+    const updatedSlots = [...dayPlan.slots];
+
+    // ドラッグされたタスクのスロットを削除
+    draggedSlots.reverse().forEach(() => {
+      updatedSlots.splice(draggedFirstSlotIndex, 1);
+    });
+
+    // 新しい位置を計算（削除後のインデックス調整）
+    const newTargetIndex = targetFirstSlotIndex > draggedFirstSlotIndex
+      ? targetFirstSlotIndex - draggedSlots.length
+      : targetFirstSlotIndex;
+
+    // 新しい位置に挿入
+    updatedSlots.splice(newTargetIndex, 0, ...draggedSlots);
+
+    // プランを更新
+    const { updateDayPlan } = await import('../utils/storage.js');
+    const updatedPlan = { ...dayPlan, slots: updatedSlots };
+    await updateDayPlan(updatedPlan);
+
+    console.log('✅ プラン並び替え完了');
+
+    // カンバンに変更を通知
+    console.log('📤 カンバンに並び替え通知送信');
+    chrome.runtime.sendMessage({
+      action: 'PLAN_UPDATED',
+      data: { reordered: true }
+    });
+
+    // プラン情報を再読み込み
+    await initializePlan();
+
+    console.log('✅ プランタスク並び替え完了');
+
+  } catch (error) {
+    console.error('❌ プラン並び替えエラー:', error);
+    throw error;
+  }
+}
+
+/**
+ * デバッグ用: テストタスクを作成してプランに追加
+ * コンソールで createTestTaskAndAddToPlan('タスク名', ポモドーロ数) を実行
+ */
+async function createTestTaskAndAddToPlan(taskName: string = 'テストタスク', pomodoros: number = 2) {
+  try {
+    console.log('🧪 テストタスク作成開始:', { taskName, pomodoros });
+
+    // タスクを作成
+    const newTask = createTask(taskName, `${taskName}の説明`, pomodoros);
+    await saveTask(newTask);
+    console.log('✅ タスク作成完了:', newTask);
+
+    // allTasksを更新
+    allTasks = await getAllTasks();
+    console.log('📋 タスクリスト更新:', { count: allTasks.length, taskIds: allTasks.map(t => t.id) });
+
+    // プランに自動追加
+    if (dayPlan) {
+      console.log('📅 プラン追加前のdayPlan:', {
+        slots: dayPlan.slots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed }))
+      });
+
+      const { assignTaskToSlot } = await import('../utils/storage.js');
+      const emptySlots = dayPlan.slots.filter((slot: any) => !slot.taskId);
+
+      if (emptySlots.length >= pomodoros) {
+        const firstEmptySlotId = emptySlots[0].id;
+        console.log('🎯 プラン追加実行中:', { taskId: newTask.id, slotId: firstEmptySlotId, pomodoros });
+
+        await assignTaskToSlot(firstEmptySlotId, newTask.id, pomodoros);
+        console.log('✅ assignTaskToSlot完了');
+
+        // assignTaskToSlot直後のプラン状態を確認
+        const { getTodayDayPlan } = await import('../utils/storage.js');
+        const updatedPlan = await getTodayDayPlan();
+        console.log('📅 assignTaskToSlot直後のdayPlan:', {
+          slots: updatedPlan.slots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed }))
+        });
+
+        // プラン情報を再読み込み
+        console.log('🔄 initializePlan実行前 - allTasks:', allTasks.map(t => ({ id: t.id, name: t.name })));
+        await initializePlan();
+        console.log('🔄 initializePlan実行後 - dayPlan:', {
+          slots: dayPlan?.slots.map((s: any) => ({ id: s.id, taskId: s.taskId, completed: s.completed }))
+        });
+
+        // 表示を更新
+        await updateCurrentTaskDisplay();
+        updatePlanDisplay();
+
+        console.log('🎉 テストタスク作成とプラン追加が完了しました！');
+      } else {
+        console.log('❌ 空きスロットが不足:', { required: pomodoros, available: emptySlots.length });
+      }
+    }
+  } catch (error) {
+    console.error('❌ テストタスク作成に失敗:', error);
+  }
+}
+
+// デバッグ関数をglobalにエクスポート（開発時のみ）
+if (typeof window !== 'undefined') {
+  (window as any).createTestTaskAndAddToPlan = createTestTaskAndAddToPlan;
+  (window as any).debugPomodoro = {
+    createTestTask: createTestTaskAndAddToPlan,
+    clearInvalidSlots: validatePlanData,
+    forceUpdatePlan: async () => {
+      console.log('🔄 強制プラン更新開始');
+      await initializePlan();
+      await updateCurrentTaskDisplay();
+      updatePlanDisplay();
+      console.log('✅ 強制プラン更新完了');
+    },
+    testKanbanSync: () => {
+      console.log('🧪 カンバン同期テスト送信');
+      chrome.runtime.sendMessage({
+        action: 'PLAN_UPDATED',
+        data: { test: true, timestamp: Date.now() }
+      });
+    },
+    showCurrentState: () => ({
+      dayPlan,
+      allTasks,
+      currentSlot,
+      nextSlot
+    })
+  };
+}
+
+/**
+ * 外部（カンバン）からの変更通知ハンドラー
+ */
+async function handleExternalUpdate() {
+  console.log('🔄 外部変更による更新開始');
+
+  try {
+    // タスクデータを再取得（少し待ってからリトライ）
+    await new Promise(resolve => setTimeout(resolve, 100));
+    allTasks = await getAllTasks();
+    console.log('📋 タスクデータ再取得:', { count: allTasks.length });
+
+    // 現在のタスクも更新
+    currentTask = await getCurrentTask();
+
+    // プラン情報を再初期化
+    await initializePlan();
+
+    // 表示を更新
+    await updateCurrentTaskDisplay();
+    updatePlanDisplay();
+
+    console.log('✅ 外部変更による更新完了');
+  } catch (error) {
+    console.error('❌ 外部変更による更新に失敗:', error);
   }
 }
 

@@ -361,10 +361,10 @@
 
 .slot-actions {
 	position: absolute;
-	top: 4px;
-	right: 4px;
+	top: 2px;
+	right: 2px;
 	display: flex;
-	gap: 2px;
+	gap: 4px;
 	opacity: 0;
 	transition: opacity 0.2s ease;
 }
@@ -374,43 +374,62 @@
 }
 
 .slot-complete-btn {
-	background: rgba(16, 185, 129, 0.9);
-	border: none;
+	background: linear-gradient(135deg, #10b981, #059669);
+	border: 2px solid white;
 	border-radius: 50%;
-	width: 18px;
-	height: 18px;
+	width: 24px;
+	height: 24px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
 	color: white;
 	transition: all 0.2s ease;
+	box-shadow: 0 2px 4px rgba(16, 185, 129, 0.4);
+	font-weight: bold;
+	font-size: 12px;
 }
 
 .slot-complete-btn:hover {
-	background: #059669;
+	background: linear-gradient(135deg, #059669, #047857);
+	transform: scale(1.2);
+	box-shadow: 0 4px 8px rgba(16, 185, 129, 0.6);
+	border-color: #f0fdf4;
+}
+
+.slot-complete-btn:active {
 	transform: scale(1.1);
+}
+
+/* 完了ボタンのアイコンを大きく */
+.slot-complete-btn svg {
+	width: 14px;
+	height: 14px;
+	stroke-width: 3;
 }
 
 .slot-remove-btn {
 	position: static;
-	background: rgba(255, 255, 255, 0.9);
-	border: none;
+	background: rgba(255, 255, 255, 0.95);
+	border: 1px solid #e5e7eb;
 	border-radius: 50%;
-	width: 18px;
-	height: 18px;
+	width: 20px;
+	height: 20px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
 	color: #6b7280;
 	transition: all 0.2s ease;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .slot-remove-btn:hover {
 	background: #fef2f2;
 	color: #ef4444;
+	border-color: #fca5a5;
 	transform: scale(1.1);
+	box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
 
 /* レスポンシブ対応 */
